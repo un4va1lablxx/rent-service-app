@@ -3,6 +3,7 @@ package edu.belsu.rent_service.domain;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,9 @@ public class User {
     @Column(name = "telegram_id", unique = true)
     private Long telegramId;
 
+    @Column(name = "telegram_username")
+    private String telegramUsername;
+
     @Column(name = "max_id", unique = true)
     private Long maxId;
 
@@ -43,9 +47,19 @@ public class User {
     @Column(name = "full_name")
     private String fullName;
 
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
     @Column(name = "role", nullable = false)
     @Builder.Default
     private String role = "user";
+
+    // Important: schema update must be able to add this column to an existing table.
+    // Postgres cannot add a NOT NULL column to a non-empty table unless a DEFAULT is provided.
+    @Column(name = "verification_status", nullable = false, length = 40, columnDefinition = "varchar(40) default 'basic_verified'")
+    @ColumnDefault("'basic_verified'")
+    @Builder.Default
+    private String verificationStatus = "basic_verified";
 
     @Column(name = "sms_verified")
     @Builder.Default
@@ -67,6 +81,26 @@ public class User {
     @Builder.Default
     private Integer reviewsCount = 0;
 
+    @Column(name = "landlord_rating")
+    @Builder.Default
+    private Double landlordRating = 0.0;
+
+    @Column(name = "tenant_rating")
+    @Builder.Default
+    private Double tenantRating = 0.0;
+
+    @Column(name = "landlord_reviews_count")
+    @Builder.Default
+    private Integer landlordReviewsCount = 0;
+
+    @Column(name = "tenant_reviews_count")
+    @Builder.Default
+    private Integer tenantReviewsCount = 0;
+
+    @Column(name = "trust_level", length = 40)
+    @Builder.Default
+    private String trustLevel = "new";
+
     @Column(name = "is_blocked")
     @Builder.Default
     private boolean blocked = false;
@@ -79,6 +113,18 @@ public class User {
 
     @Column(name = "preferred_messenger", length = 20)
     private String preferredMessenger;
+
+    @Column(name = "payout_bank_name")
+    private String payoutBankName;
+
+    @Column(name = "payout_account_number", length = 64)
+    private String payoutAccountNumber;
+
+    @Column(name = "payout_card_cvc", length = 8)
+    private String payoutCardCvc;
+
+    @Column(name = "payout_card_expiry", length = 7)
+    private String payoutCardExpiry;
 
     @Column(name = "last_seen_at")
     private LocalDateTime lastSeenAt;

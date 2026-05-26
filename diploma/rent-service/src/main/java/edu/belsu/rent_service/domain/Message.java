@@ -41,6 +41,9 @@ public class Message {
     @Builder.Default
     private String messageType = "text";
 
+    @Column(name = "related_id")
+    private Long relatedId;
+
     @Column(name = "contains_contact_details")
     @Builder.Default
     private boolean containsContactDetails = false;

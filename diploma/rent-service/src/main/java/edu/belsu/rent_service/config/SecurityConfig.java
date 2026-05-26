@@ -1,6 +1,6 @@
 package edu.belsu.rent_service.config;
 
-import edu.belsu.rent_service.security.JwtAuthenticationFilter;
+import edu.belsu.rent_service.adapters.out.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,7 +49,18 @@ public class SecurityConfig {
                     response.getWriter().write("{\"error\":\"Unauthorized\"}");
                 }))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/sms-code", "/error").permitAll()
+                        .requestMatchers(
+                                "/api/auth/register",
+                                "/api/auth/login",
+                                "/api/auth/password-reset/start",
+                                "/api/auth/password-reset/confirm",
+                                "/api/auth/sms-code",
+                                "/api/auth/telegram/register/start",
+                                "/api/auth/telegram/login/start",
+                                "/api/auth/telegram/status/*",
+                                "/ws/**",
+                                "/error"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/ads", "/api/ads/*").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()

@@ -1,10 +1,13 @@
 HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
 
-### STS ###
+target/
+build/
+.mvn/
+.gradle/
+*.jar
+*.war
+*.ear
+
 .apt_generated
 .classpath
 .factorypath
@@ -12,22 +15,20 @@ target/
 .settings
 .springBeans
 .sts4-cache
-
-### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
-
-### NetBeans ###
+.vscode/
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### VS Code ###
-.vscode/
+# --- Logs and System Files ---
+*.log
+vite.err.log
+vite.out.log
+.DS_Store
+Thumbs.db

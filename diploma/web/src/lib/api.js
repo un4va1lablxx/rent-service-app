@@ -1,6 +1,12 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8080";
 
+function resolveWebSocketUrl(path) {
+  const baseUrl = new URL(API_BASE_URL);
+  const protocol = baseUrl.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${baseUrl.host}${path}`;
+}
+
 async function request(path, options = {}) {
   const token = localStorage.getItem("rent-service-token");
   const headers = new Headers(options.headers || {});
@@ -12,16 +18,24 @@ async function request(path, options = {}) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("Не удалось подключиться к серверу. Проверьте, что backend запущен, и попробуйте еще раз.");
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     let message = `Request failed: ${response.status}`;
     try {
       const data = await response.json();
-      message = data.error || message;
+      message = data.error || data.message || message;
     } catch {
       // ignore
     }
@@ -69,11 +83,46 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
+  startPasswordReset: (phoneNumber) =>
+    request("/api/auth/password-reset/start", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber })
+    }),
+  confirmPasswordReset: (payload) =>
+    request("/api/auth/password-reset/confirm", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  startTelegramRegister: (payload) =>
+    request("/api/auth/telegram/register/start", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  startTelegramLogin: (payload) =>
+    request("/api/auth/telegram/login/start", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  telegramStatus: (requestId) => request(`/api/auth/telegram/status/${requestId}`),
   me: () => request("/api/auth/me"),
   updateMyRole: (role) =>
     request("/api/users/me/role", {
       method: "PATCH",
       body: JSON.stringify({ role })
+    }),
+  updateMyPaymentDetails: (payload) =>
+    request("/api/users/me/payment-details", {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }),
+  deleteMyPaymentDetails: () =>
+    request("/api/users/me/payment-details", {
+      method: "DELETE"
+    }),
+  updateMyAvatar: (avatarUrl) =>
+    request("/api/users/me/avatar", {
+      method: "PATCH",
+      body: JSON.stringify({ avatarUrl })
     })
 };
 
@@ -119,11 +168,61 @@ export const messagesApi = {
   dialog: (adId, otherUserId) =>
     request(`/api/messages/dialogs/${adId}/${otherUserId}${queryString({ page: 0, size: 200 })}`),
   unreadCount: () => request("/api/messages/unread-count"),
+  proposeViewing: (payload) =>
+    request("/api/messages/viewings/propose", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  decideViewing: (messageId, accepted) =>
+    request(`/api/messages/viewings/proposals/${messageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ accepted })
+    }),
+  submitViewingResult: (viewingRequestId, confirmed) =>
+    request(`/api/messages/viewings/${viewingRequestId}/result`, {
+      method: "PATCH",
+      body: JSON.stringify({ confirmed })
+    }),
+  createContract: (payload) =>
+    request("/api/messages/contracts", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  contractDetails: (contractId) => request(`/api/messages/contracts/${contractId}`),
+  signContract: (contractId, payload) =>
+    request(`/api/messages/contracts/${contractId}/sign`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }),
+  paymentDetails: (paymentId) => request(`/api/messages/payments/${paymentId}`),
+  pay: (paymentId, payload) =>
+    request(`/api/messages/payments/${paymentId}/pay`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }),
+  declineContract: (payload) =>
+    request("/api/messages/contracts/decline", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
   send: (payload) =>
     request("/api/messages", {
       method: "POST",
       body: JSON.stringify(payload)
     })
+};
+
+export const messagesSocketApi = {
+  connect: () => {
+    const token = storage.getToken();
+    if (!token) {
+      return null;
+    }
+
+    return new WebSocket(
+      `${resolveWebSocketUrl("/ws/messages")}?token=${encodeURIComponent(token)}`
+    );
+  }
 };
 
 export const bookingsApi = {
@@ -155,44 +254,51 @@ export const verificationApi = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
-  mine: () => request(`/api/verifications/me${queryString({ page: 0, size: 50 })}`)
+  mine: () => request("/api/verifications/me")
 };
 
 export const uploadApi = {
-    upload: (file) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        return request('/api/upload', {
-            method: 'POST',
-            body: formData,
-            headers: {} // не ставим Content-Type, браузер сам поставит с boundary
-        });
-    }
+  uploadFile: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request("/api/upload/file", {
+      method: "POST",
+      body: formData,
+      headers: {}
+    });
+  }
 };
 
 export const adminApi = {
-    stats: () => request("/api/admin/stats"),
-    users: (page = 0, size = 100) => request(`/api/admin/users?page=${page}&size=${size}`),
-    getAllAds: (status = null, page = 0, size = 100) => {
-        let url = `/api/admin/ads/all?page=${page}&size=${size}`;
-        if (status && status !== "all") {
-            url += `&status=${status}`;
-        }
-        return request(url);
-    },
-    moderateAd: (adId, payload) =>
-        request(`/api/admin/ads/${adId}/moderation`, {
-            method: "PATCH",
-            body: JSON.stringify(payload)
-        }),
-    updateUserBlock: (userId, blocked, reason = "") =>
-        request(`/api/admin/users/${userId}/block`, {
-            method: "PATCH",
-            body: JSON.stringify({ blocked, reason })
-        }),
-    updateUserVerification: (userId, verified, smsVerified = false, gosuslugiVerified = false) =>
-        request(`/api/admin/users/${userId}/verification`, {
-            method: "PATCH",
-            body: JSON.stringify({ verified, smsVerified, gosuslugiVerified })
-        }),
+  stats: () => request("/api/admin/stats"),
+  users: (page = 0, size = 100) => request(`/api/admin/users?page=${page}&size=${size}`),
+  getAllAds: (status = null, page = 0, size = 100) => {
+    let url = `/api/admin/ads/all?page=${page}&size=${size}`;
+    if (status && status !== "all") {
+      url += `&status=${status}`;
+    }
+    return request(url);
+  },
+  moderateAd: (adId, payload) =>
+    request(`/api/admin/ads/${adId}/moderation`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }),
+  updateUserBlock: (userId, blocked, reason = "") =>
+    request(`/api/admin/users/${userId}/block`, {
+      method: "PATCH",
+      body: JSON.stringify({ blocked, reason })
+    }),
+  updateUserVerification: (userId, verified, smsVerified = false, gosuslugiVerified = false) =>
+    request(`/api/admin/users/${userId}/verification`, {
+      method: "PATCH",
+      body: JSON.stringify({ verified, smsVerified, gosuslugiVerified })
+    }),
+  listVerificationRequests: (status = "pending") =>
+    request(`/api/admin/verifications${queryString({ status })}`),
+  decideVerificationRequest: (requestId, payload) =>
+    request(`/api/admin/verifications/${requestId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    })
 };
