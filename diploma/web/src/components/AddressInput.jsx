@@ -1,19 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from "react";
 
-const DADATA_API_KEY = '25fcfb5efefa78337862051ad97f5be41c0cc263'; // Сюда свой ключ
+const DADATA_API_KEY = "25fcfb5efefa78337862051ad97f5be41c0cc263";
 
-export default function AddressInput({ value, onChange, placeholder = "Введите адрес" }) {
+export default function AddressInput({
+    value,
+    onChange,
+    placeholder = "Введите адрес",
+    readOnly = false
+}) {
     const [suggestions, setSuggestions] = useState([]);
     const [inputValue, setInputValue] = useState(value || "");
     const [isLoading, setIsLoading] = useState(false);
     const wrapperRef = useRef(null);
 
     useEffect(() => {
-        const handleClickOutside = (event) => {
+        function handleClickOutside(event) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
                 setSuggestions([]);
             }
-        };
+        }
+
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
@@ -22,10 +28,10 @@ export default function AddressInput({ value, onChange, placeholder = "Введ�
         if (value !== inputValue) {
             setInputValue(value || "");
         }
-    }, [value]);
+    }, [inputValue, value]);
 
-    const fetchSuggestions = async (query) => {
-        if (!query || query.length < 2) {
+    async function fetchSuggestions(query) {
+        if (!query || query.length < 2 || readOnly) {
             setSuggestions([]);
             return;
         }
@@ -36,13 +42,12 @@ export default function AddressInput({ value, onChange, placeholder = "Введ�
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "Authorization": `Token ${DADATA_API_KEY}`
+                    Accept: "application/json",
+                    Authorization: `Token ${DADATA_API_KEY}`
                 },
                 body: JSON.stringify({
-                    query: query,
+                    query,
                     count: 8,
-                    // Можно ограничить поиск Россией
                     locations: [{ country_iso_code: "RU" }]
                 })
             });
@@ -55,24 +60,24 @@ export default function AddressInput({ value, onChange, placeholder = "Введ�
         } finally {
             setIsLoading(false);
         }
-    };
+    }
 
-    const handleInputChange = (e) => {
-        const newValue = e.target.value;
+    function handleInputChange(event) {
+        const newValue = event.target.value;
         setInputValue(newValue);
         onChange(newValue);
         fetchSuggestions(newValue);
-    };
+    }
 
-    const handleSelectSuggestion = (suggestion) => {
+    function handleSelectSuggestion(suggestion) {
         const fullAddress = suggestion.value;
         setInputValue(fullAddress);
         onChange(fullAddress);
         setSuggestions([]);
-    };
+    }
 
     return (
-        <div className="address-input-container" ref={wrapperRef} style={{ position: 'relative' }}>
+        <div className="address-input-container" ref={wrapperRef} style={{ position: "relative" }}>
             <input
                 type="text"
                 value={inputValue}
@@ -80,9 +85,10 @@ export default function AddressInput({ value, onChange, placeholder = "Введ�
                 placeholder={placeholder}
                 className="address-input"
                 autoComplete="off"
+                readOnly={readOnly}
             />
-            {isLoading && <div className="loading-indicator">Загрузка...</div>}
-            {suggestions.length > 0 && (
+            {isLoading && !readOnly && <div className="loading-indicator">Загрузка...</div>}
+            {!readOnly && suggestions.length > 0 && (
                 <ul className="suggestions-list">
                     {suggestions.map((suggestion, index) => (
                         <li key={index} onClick={() => handleSelectSuggestion(suggestion)}>

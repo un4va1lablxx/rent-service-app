@@ -26,7 +26,7 @@ async function request(path, options = {}) {
     });
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error("Не удалось подключиться к серверу. Проверьте, что backend запущен, и попробуйте еще раз.");
+      throw new Error("Не удалось подключиться к серверу");
     }
     throw error;
   }
@@ -119,6 +119,15 @@ export const authApi = {
     request("/api/users/me/payment-details", {
       method: "DELETE"
     }),
+  updateMyPassportDetails: (payload) =>
+    request("/api/users/me/passport-details", {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }),
+  deleteMyPassportDetails: () =>
+    request("/api/users/me/passport-details", {
+      method: "DELETE"
+    }),
   updateMyAvatar: (avatarUrl) =>
     request("/api/users/me/avatar", {
       method: "PATCH",
@@ -147,6 +156,10 @@ export const adsApi = {
   deactivate: (adId) =>
     request(`/api/ads/${adId}/deactivate`, {
       method: "PATCH"
+    }),
+  remove: (adId) =>
+    request(`/api/ads/${adId}`, {
+      method: "DELETE"
     })
 };
 
@@ -245,6 +258,36 @@ export const reviewsApi = {
     request("/api/reviews", {
       method: "POST",
       body: JSON.stringify(payload)
+    }),
+  update: (reviewId, payload) =>
+    request(`/api/reviews/${reviewId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }),
+  remove: (reviewId) =>
+    request(`/api/reviews/${reviewId}`, {
+      method: "DELETE"
+    })
+};
+
+export const usersApi = {
+  publicProfile: (userId) => request(`/api/users/${userId}/public`)
+};
+
+export const notificationsApi = {
+  list: () => request("/api/notifications"),
+  unreadCount: () => request("/api/notifications/unread-count"),
+  markRead: (notificationId) =>
+    request(`/api/notifications/${notificationId}/read`, {
+      method: "PATCH"
+    }),
+  remove: (notificationId) =>
+    request(`/api/notifications/${notificationId}`, {
+      method: "DELETE"
+    }),
+  clear: () =>
+    request("/api/notifications", {
+      method: "DELETE"
     })
 };
 
@@ -254,7 +297,11 @@ export const verificationApi = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
-  mine: () => request("/api/verifications/me")
+  mine: () => request("/api/verifications/me"),
+  removeDocument: (requestId, fieldKey) =>
+    request(`/api/verifications/${requestId}/documents/${fieldKey}`, {
+      method: "DELETE"
+    })
 };
 
 export const uploadApi = {
@@ -270,35 +317,56 @@ export const uploadApi = {
 };
 
 export const adminApi = {
-  stats: () => request("/api/admin/stats"),
-  users: (page = 0, size = 100) => request(`/api/admin/users?page=${page}&size=${size}`),
-  getAllAds: (status = null, page = 0, size = 100) => {
-    let url = `/api/admin/ads/all?page=${page}&size=${size}`;
-    if (status && status !== "all") {
-      url += `&status=${status}`;
-    }
-    return request(url);
-  },
-  moderateAd: (adId, payload) =>
-    request(`/api/admin/ads/${adId}/moderation`, {
-      method: "PATCH",
-      body: JSON.stringify(payload)
-    }),
-  updateUserBlock: (userId, blocked, reason = "") =>
-    request(`/api/admin/users/${userId}/block`, {
-      method: "PATCH",
-      body: JSON.stringify({ blocked, reason })
-    }),
-  updateUserVerification: (userId, verified, smsVerified = false, gosuslugiVerified = false) =>
-    request(`/api/admin/users/${userId}/verification`, {
-      method: "PATCH",
-      body: JSON.stringify({ verified, smsVerified, gosuslugiVerified })
-    }),
-  listVerificationRequests: (status = "pending") =>
-    request(`/api/admin/verifications${queryString({ status })}`),
-  decideVerificationRequest: (requestId, payload) =>
-    request(`/api/admin/verifications/${requestId}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload)
-    })
+    stats: () => request("/api/admin/stats"),
+    users: (page = 0, size = 100) => request(`/api/admin/users?page=${page}&size=${size}`),
+
+    getAllAds: (status = null, page = 0, size = 100) => {
+        let url = `/api/admin/ads/all?page=${page}&size=${size}`;
+        if (status && status !== "all") {
+            url += `&status=${status}`;
+        }
+        return request(url);
+    },
+
+    adDetails: (adId) => request(`/api/admin/ads/${adId}`),
+
+    moderateAd: (adId, payload) =>
+        request(`/api/admin/ads/${adId}/moderation`, {
+            method: "PATCH",
+            body: JSON.stringify(payload)
+        }),
+
+    updateUserBlock: (userId, blocked, reason = "") =>
+        request(`/api/admin/users/${userId}/block`, {
+            method: "PATCH",
+            body: JSON.stringify({ blocked, reason })
+        }),
+
+    updateUserVerification: (
+        userId,
+        verified,
+        smsVerified = false,
+        gosuslugiVerified = false,
+        verificationType = null,
+        revokeOwnerVerification = false
+    ) =>
+        request(`/api/admin/users/${userId}/verification`, {
+            method: "PATCH",
+            body: JSON.stringify({
+                verified,
+                smsVerified,
+                gosuslugiVerified,
+                verificationType,
+                revokeOwnerVerification
+            })
+        }),
+
+    listVerificationRequests: (status = "pending") =>
+        request(`/api/admin/verifications${queryString({ status })}`),
+
+    decideVerificationRequest: (requestId, payload) =>
+        request(`/api/admin/verifications/${requestId}`, {
+            method: "PATCH",
+            body: JSON.stringify(payload)
+        })
 };

@@ -108,6 +108,10 @@ public class User {
     @Column(name = "block_reason")
     private String blockReason;
 
+    @Column(name = "warnings_count")
+    @Builder.Default
+    private Integer warningsCount = 0;
+
     @Column(name = "public_key", columnDefinition = "TEXT")
     private String publicKey;
 
@@ -125,6 +129,21 @@ public class User {
 
     @Column(name = "payout_card_expiry", length = 7)
     private String payoutCardExpiry;
+
+    @Column(name = "passport_citizenship_encrypted")
+    private String passportCitizenshipEncrypted;
+
+    @Column(name = "passport_number_encrypted")
+    private String passportNumberEncrypted;
+
+    @Column(name = "passport_issued_by_encrypted")
+    private String passportIssuedByEncrypted;
+
+    @Column(name = "passport_issued_at_encrypted")
+    private String passportIssuedAtEncrypted;
+
+    @Column(name = "passport_registration_address_encrypted", columnDefinition = "TEXT")
+    private String passportRegistrationAddressEncrypted;
 
     @Column(name = "last_seen_at")
     private LocalDateTime lastSeenAt;

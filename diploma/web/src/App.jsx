@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+﻿import { useMemo, useRef, useState } from "react";
 import ImageUploader from "./components/ImageUploader";
 import AddressInput from "./components/AddressInput.jsx";
 import {
@@ -8,9 +8,11 @@ import {
     bookingsApi,
     favoritesApi,
     messagesApi,
+    notificationsApi,
     reviewsApi,
     storage,
     uploadApi,
+    usersApi,
     verificationApi
 } from "./lib/api";
 import { initialDraft, navItems, propertyOptions, roomOptions } from "./shared/appConstants";
@@ -45,6 +47,13 @@ export default function App() {
         selectedTab,
         setSelectedTab,
         unreadCount,
+        notifications,
+        notificationsUnread,
+        notificationsOpen,
+        setNotificationsOpen,
+        markNotificationRead,
+        removeNotification,
+        clearNotifications,
         handleLogout,
         isLandlord,
         isAdmin,
@@ -55,23 +64,16 @@ export default function App() {
     } = appState;
 
     const navScrollRef = useRef(null);
+    const [expandedNotificationId, setExpandedNotificationId] = useState(null);
+
     const shortProfileName = useMemo(() => {
-        if (!profile?.fullName) {
-            return "";
-        }
+        if (!profile?.fullName) return "";
         const parts = profile.fullName.trim().split(/\s+/).filter(Boolean);
-        if (parts.length === 1) {
-            return parts[0];
-        }
-        return `${parts[0]} ${parts[1]?.charAt(0) || ""}.`.trim();
+        return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[1]?.charAt(0) || ""}.`.trim();
     }, [profile?.fullName]);
-    const isAdminWorkspace = isAdmin && selectedTab === "admin";
 
     function scrollNav(direction) {
-        navScrollRef.current?.scrollBy({
-            left: direction * 180,
-            behavior: "smooth"
-        });
+        navScrollRef.current?.scrollBy({ left: direction * 180, behavior: "smooth" });
     }
 
     const appViewProps = {
@@ -84,8 +86,10 @@ export default function App() {
         bookingsApi,
         favoritesApi,
         messagesApi,
+        notificationsApi,
         reviewsApi,
         uploadApi,
+        usersApi,
         verificationApi,
         storage,
         initialDraft,
@@ -112,79 +116,81 @@ export default function App() {
         normalizeNumber
     };
 
-    if (bootstrapping) {
-        return <BootScreen {...appViewProps} />;
-    }
+    if (bootstrapping) return <BootScreen {...appViewProps} />;
+    if (!profile) return <AuthScreen {...appViewProps} />;
 
-    if (!profile) {
-        return <AuthScreen {...appViewProps} />;
+    if (profile.blocked) {
+        return (
+            <div className="blocked-screen">
+                <div className="blocked-screen-card glass">
+                    <h1>Ваш аккаунт заблокирован</h1>
+                    <p>Доступ к системе ограничен. Обратитесь в поддержку или к администратору.</p>
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="app-shell">
             <header className="topbar glass">
                 <div className="brand-lockup">
-                    <div className="brand-mark">
-                        <img src="/logo.png" alt="Логотип Rent" />
-                    </div>
+                    <div className="brand-mark"><img src="/logo.png" alt="Логотип Rent" /></div>
                     <div className="brand-name">Рент</div>
                 </div>
                 <div className="topbar-nav-shell">
-                    <button
-                        className="nav-scroll-button"
-                        type="button"
-                        onClick={() => scrollNav(-1)}
-                        title="Прокрутить влево"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path
-                                d="M14.5 5 8 12l6.5 7"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.7"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                    </button>
+                    <button className="nav-scroll-button" type="button" onClick={() => scrollNav(-1)} title="Прокрутить влево">◀</button>
                     <div className="topbar-nav-track" ref={navScrollRef}>
                         <nav className="topbar-nav">
                             {visibleNavItems.map((item) => (
-                                <button
-                                    key={item.key}
-                                    className={selectedTab === item.key ? "active" : ""}
-                                    type="button"
-                                    onClick={() => setSelectedTab(item.key)}
-                                >
+                                <button key={item.key} className={selectedTab === item.key ? "active" : ""} type="button" onClick={() => setSelectedTab(item.key)}>
                                     {item.label}
                                     {item.key === "messages" && unreadCount > 0 && <span className="badge">{unreadCount}</span>}
                                 </button>
                             ))}
                         </nav>
                         <div className="topbar-account">
-                            <span className="topbar-user-short">{shortProfileName}</span>
-                            <button className="icon-button" type="button" onClick={handleLogout} title="Выйти">
-                                <Icon name="logout" />
+                            <button className="icon-button notifications-button" type="button" onClick={() => setNotificationsOpen(!notificationsOpen)} title="Уведомления">
+                                <img src="/notifications-bell.png" alt="Уведомления" />
+                                {notificationsUnread > 0 && <span className="badge">{notificationsUnread}</span>}
                             </button>
+                            <div className={`topbar-mini-avatar ${profile?.avatarUrl ? "has-photo" : ""}`}>
+                                {profile?.avatarUrl ? <img src={profile.avatarUrl} alt={shortProfileName} /> : <span>{shortProfileName?.charAt(0) || "П"}</span>}
+                            </div>
+                            <span className="topbar-user-short">{shortProfileName}</span>
+                            <button className="icon-button" type="button" onClick={handleLogout} title="Выйти"><Icon name="logout" /></button>
+                            {notificationsOpen && (
+                                <div className="notifications-dropdown glass">
+                                    <div className="notifications-modal-head">
+                                        <h3>Уведомления</h3>
+                                        <div className="notifications-head-actions">
+                                            <button className="ghost-button" type="button" onClick={clearNotifications}>Удалить все</button>
+                                            <button className="ghost-button" type="button" onClick={() => setNotificationsOpen(false)}>Закрыть</button>
+                                        </div>
+                                    </div>
+                                    <div className="notifications-list">
+                                        {notifications.length ? notifications.map((item) => (
+                                            <div key={item.id} className={`notification-item ${item.read ? "is-read" : "is-unread"}`}>
+                                                <button
+                                                    className="notification-main"
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setExpandedNotificationId((prev) => prev === item.id ? null : item.id);
+                                                        markNotificationRead(item.id);
+                                                    }}
+                                                >
+                                                    <strong>Вы получили сообщение от администратора</strong>
+                                                    <small>{new Date(item.createdAt).toLocaleString("ru-RU")}</small>
+                                                    {expandedNotificationId === item.id && <p>{item.message}</p>}
+                                                </button>
+                                                <button className="notification-delete" type="button" onClick={() => removeNotification(item.id)}>Удалить</button>
+                                            </div>
+                                        )) : <div className="empty-inline">Уведомлений пока нет.</div>}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <button
-                        className="nav-scroll-button"
-                        type="button"
-                        onClick={() => scrollNav(1)}
-                        title="Прокрутить вправо"
-                    >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path
-                                d="m9.5 5 6.5 7-6.5 7"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.7"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                    </button>
+                    <button className="nav-scroll-button" type="button" onClick={() => scrollNav(1)} title="Прокрутить вправо">▶</button>
                 </div>
             </header>
 
@@ -199,31 +205,12 @@ export default function App() {
 
             {(notice || error) && (
                 <div className="toast-stack" aria-live="polite">
-                    {notice && (
-                        <div className="toast-card toast-success">
-                            <span>{notice}</span>
-                            <button type="button" className="toast-close" onClick={() => setNotice("")} aria-label="Закрыть уведомление">
-                                ×
-                            </button>
-                        </div>
-                    )}
-                    {error && (
-                        <div className="toast-card toast-error" role="alert">
-                            <span>{error}</span>
-                            <button type="button" className="toast-close" onClick={() => setError("")} aria-label="Закрыть ошибку">
-                                ×
-                            </button>
-                        </div>
-                    )}
+                    {notice && <div className="toast-card toast-success"><span>{notice}</span><button type="button" className="toast-close" onClick={() => setNotice("")} aria-label="Закрыть уведомление">×</button></div>}
+                    {error && <div className="toast-card toast-error" role="alert"><span>{error}</span><button type="button" className="toast-close" onClick={() => setError("")} aria-label="Закрыть ошибку">×</button></div>}
                 </div>
             )}
 
-            <footer className="footer glass">
-                <div className="footer-bottom">
-                    <p>© 2026 Рент — сервис аренды недвижимости</p>
-                </div>
-            </footer>
-
+            <footer className="footer glass"><div className="footer-bottom"><p>© 2026 Рент — сервис аренды недвижимости</p></div></footer>
             <AppModals {...appViewProps} />
         </div>
     );
