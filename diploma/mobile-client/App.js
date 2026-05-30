@@ -11,8 +11,9 @@ import {
     SafeAreaView,
     SafeAreaProvider,
 } from "react-native-safe-area-context";
+import { Bell, Heart, Home, LogOut, MessageCircle, Plus, ShieldCheck, UserRound } from "lucide-react-native";
 
-// Импорт всех необходимых модулей и зависимостей остается неизменным
+// Импорт всех необходимых модулей и зависимостей
 import ImageUploader from "./src/components/ImageUploader.jsx";
 import AddressInput from "./src/components/AddressInput.jsx";
 import {
@@ -27,12 +28,13 @@ import {
     storage,
     uploadApi,
     usersApi,
-    verificationApi
+    verificationApi,
+    assetUrl
 } from "./src/lib/api";
 import { initialDraft, navItems, propertyOptions, roomOptions } from "./src/shared/appConstants";
 import { Field, Metric, Modal, Icon } from "./src/components/ui";
 import { DetailsModal, ListingCard } from "./src/components/listings/ListingComponents";
-//import { renderChatMessage } from "./src/components/messages/chatRendering";
+import { renderChatMessage } from "./src/components/messages/chatRendering";
 import { fallbackImage, formatMoney, formatPriceWithType, propertyLabel, roleLabel, statusLabel } from "./src/shared/formatters";
 import {
     autoResizeTextarea,
@@ -49,13 +51,23 @@ import { AuthScreen } from "./src/screens/AuthScreen";
 // Экраны вкладок
 import { DiscoverScreen } from "./src/screens/DiscoverScreen";
 import { FavoritesScreen } from "./src/screens/FavoritesScreen";
-//import { MessagesScreen } from "./src/screens/MessagesScreen";
-//import { ManageScreen } from "./src/screens/ManageScreen";
-//import { ProfileScreen } from "./src/screens/ProfileScreen";
-//import { AdminScreen } from "./src/screens/AdminScreen";
+import { MessagesScreen } from "./src/screens/MessagesScreen";
+import { ManageScreen } from "./src/screens/ManageScreen";
+import { ProfileScreen } from "./src/screens/ProfileScreen";
+import { AdminScreen } from "./src/screens/AdminScreen";
 
 import { AppModals } from "./src/components/app/AppModals";
+import { DocumentViewer } from "./src/components/DocumentViewer.jsx";
 import { useRentServiceApp } from "./src/app/useRentServiceApp";
+
+const tabIconMap = {
+    discover: Home,
+    favorites: Heart,
+    messages: MessageCircle,
+    manage: Plus,
+    profile: UserRound,
+    admin: ShieldCheck,
+};
 
 export default function App() {
     const appState = useRentServiceApp();
@@ -83,6 +95,7 @@ export default function App() {
     } = appState;
 
     const [expandedNotificationId, setExpandedNotificationId] = useState(null);
+    const [documentViewer, setDocumentViewer] = useState(null);
 
     // Форматирование имени пользователя для аватара
     const shortProfileName = useMemo(() => {
@@ -118,7 +131,8 @@ export default function App() {
         Icon,
         DetailsModal,
         ListingCard,
-        //renderChatMessage,
+        renderChatMessage,
+        openDocumentViewer: (url, title) => setDocumentViewer({ url, title }),
         formatMoney,
         formatPriceWithType,
         fallbackImage,
@@ -155,156 +169,173 @@ export default function App() {
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.appShell}>
-
-            {/* ==========================================
-          ВЕРХНЯЯ ШАПКА ПРИЛОЖЕНИЯ (Topbar)
-          ========================================== */}
-            <View style={[styles.topbar, styles.glass]}>
-                <View style={styles.brandLockup}>
-                    {/* Локальные изображения в React Native подключаются через require() */}
-                    <Image source={require("./assets/logo.png")} style={styles.logo} />
-                    <Text style={styles.brandName}>Рент</Text>
-                </View>
-
-                <View style={styles.topbarActions}>
-                    {/* Кнопка Уведомлений */}
-                    <TouchableOpacity
-                        style={styles.iconButton}
-                        onPress={() => setNotificationsOpen(!notificationsOpen)}
-                    >
-                        <Image source={require("./assets/notifications-bell.png")} style={styles.bellIcon} />
-                        {notificationsUnread > 0 && (
-                            <View style={styles.badge}><Text style={styles.badgeText}>{notificationsUnread}</Text></View>
-                        )}
-                    </TouchableOpacity>
-
-                    {/* Аватар пользователя */}
-                    <View style={styles.miniAvatar}>
-                        {profile?.avatarUrl ? (
-                            <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImg} />
-                        ) : (
-                            <Text style={styles.avatarFallbackText}>{shortProfileName?.charAt(0) || "П"}</Text>
-                        )}
+                {/* ==========================================
+                ВЕРХНЯЯ ШАПКА ПРИЛОЖЕНИЯ (Topbar)
+                ========================================== */}
+                <View style={[styles.topbar, styles.glass]}>
+                    <View style={styles.brandLockup}>
+                        <Image source={require("./assets/logo.png")} style={styles.logo} />
+                        <Text style={styles.brandName}>Рент</Text>
                     </View>
 
-                    {/* Кнопка Выхода */}
-                    <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
-                        <Icon name="logout" />
-                    </TouchableOpacity>
-                </View>
-            </View>
+                    <View style={styles.topbarActions}>
+                        {/* Кнопка Уведомлений */}
+                        <TouchableOpacity
+                            style={styles.iconButton}
+                            onPress={() => setNotificationsOpen(!notificationsOpen)}
+                        >
+                            <Bell size={22} color="#1C1C1E" strokeWidth={2.1} />
+                            {notificationsUnread > 0 && (
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>{notificationsUnread}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
 
-            {/* ==========================================
-          ОСНОВНОЙ КОНТЕНТ (Активный экран)
-          ========================================== */}
-            <View style={styles.mainPage}>
-                {selectedTab === "discover" && <DiscoverScreen {...appViewProps} />}
-                {selectedTab === "favorites" && <FavoritesScreen {...appViewProps} />}
-                {selectedTab === "messages" && <MessagesScreen {...appViewProps} />}
-                {selectedTab === "manage" && isLandlord && <ManageScreen {...appViewProps} />}
-                {selectedTab === "profile" && <ProfileScreen {...appViewProps} />}
-                {selectedTab === "admin" && isAdmin && <AdminScreen {...appViewProps} />}
-            </View>
-
-            {/* ==========================================
-          НИЖНИЙ НАВИГАЦИОННЫЙ БАР (Bottom Tab Bar)
-          ========================================== */}
-            <View style={[styles.bottomTabBar, styles.glass]}>
-                {visibleNavItems.map((item) => (
-                    <TouchableOpacity
-                        key={item.key}
-                        style={styles.tabItem}
-                        onPress={() => setSelectedTab(item.key)}
-                    >
-                        <Text style={[styles.tabLabel, selectedTab === item.key ? styles.tabLabelActive : null]}>
-                            {item.label}
-                        </Text>
-                        {item.key === "messages" && unreadCount > 0 && (
-                            <View style={styles.tabBadge}>
-                                <Text style={styles.tabBadgeText}>{unreadCount}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* ==========================================
-          ШТОРКА УВЕДОМЛЕНИЙ (Full-screen Overlay)
-          ========================================== */}
-            {notificationsOpen && (
-                <View style={[styles.notificationsOverlay, styles.glass]}>
-                    <SafeAreaView style={{ flex: 1 }}>
-                        <View style={styles.notificationsHeader}>
-                            <Text style={styles.notificationsTitle}>Уведомления</Text>
-                            <View style={styles.notificationsHeaderActions}>
-                                <TouchableOpacity style={styles.ghostButton} onPress={clearNotifications}>
-                                    <Text style={styles.ghostButtonText}>Удалить все</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.ghostButton} onPress={() => setNotificationsOpen(false)}>
-                                    <Text style={styles.ghostButtonCloseText}>Закрыть</Text>
-                                </TouchableOpacity>
-                            </View>
+                        {/* Аватар пользователя */}
+                        <View style={styles.miniAvatar}>
+                            {profile?.avatarUrl ? (
+                                <Image source={{ uri: assetUrl(profile.avatarUrl) }} style={styles.avatarImg} />
+                            ) : (
+                                <Text style={styles.avatarFallbackText}>{shortProfileName?.charAt(0) || "П"}</Text>
+                            )}
                         </View>
 
-                        <ScrollView style={styles.notificationsList}>
-                            {notifications.length ? notifications.map((item) => (
-                                <View key={item.id} style={[styles.notificationItem, item.read ? styles.notificationRead : styles.notificationUnread]}>
-                                    <TouchableOpacity
-                                        style={styles.notificationMainClick}
-                                        onPress={() => {
-                                            setExpandedNotificationId((prev) => prev === item.id ? null : item.id);
-                                            markNotificationRead(item.id);
-                                        }}
-                                    >
-                                        <Text style={styles.notificationItemTitle}>Вы получили сообщение от администратора</Text>
-                                        <Text style={styles.notificationTime}>{new Date(item.createdAt).toLocaleString("ru-RU")}</Text>
-                                        {expandedNotificationId === item.id && (
-                                            <Text style={styles.notificationBodyText}>{item.message}</Text>
-                                        )}
+                        {/* Кнопка Выхода */}
+                        <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
+                            <LogOut size={23} color="#1C1C1E" strokeWidth={2.1} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* ==========================================
+                ОСНОВНОЙ КОНТЕНТ (Активный экран)
+                ========================================== */}
+                <View style={styles.mainPage}>
+                    {selectedTab === "discover" && <DiscoverScreen {...appViewProps} />}
+                    {selectedTab === "favorites" && <FavoritesScreen {...appViewProps} />}
+                    {selectedTab === "messages" && <MessagesScreen {...appViewProps} />}
+                    {selectedTab === "manage" && isLandlord && <ManageScreen {...appViewProps} />}
+                    {selectedTab === "profile" && <ProfileScreen {...appViewProps} />}
+                    {selectedTab === "admin" && isAdmin && <AdminScreen {...appViewProps} />}
+                </View>
+
+                {/* ==========================================
+                НИЖНИЙ НАВИГАЦИОННЫЙ БАР (Bottom Tab Bar)
+                ========================================== */}
+                <View style={[styles.bottomTabBar, styles.glass]}>
+                    {visibleNavItems.map((item) => {
+                        const TabIcon = tabIconMap[item.key] || Home;
+                        const active = selectedTab === item.key; // ✅ Добавлена переменная active
+
+                        return (
+                            <TouchableOpacity
+                                key={item.key}
+                                style={styles.tabItem}
+                                onPress={() => setSelectedTab(item.key)}
+                                accessibilityRole="button"
+                                accessibilityLabel={item.label}
+                            >
+                                <View style={[styles.tabIconPill, active && styles.tabIconPillActive]}>
+                                    <TabIcon
+                                        size={23}
+                                        color={active ? "#007AFF" : "#8E8E93"}
+                                        strokeWidth={active ? 2.45 : 2}
+                                    />
+                                    {item.key === "messages" && unreadCount > 0 && (
+                                        <View style={styles.tabBadge}>
+                                            <Text style={styles.tabBadgeText}>{unreadCount}</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                {/* ==========================================
+                ШТОРКА УВЕДОМЛЕНИЙ (Full-screen Overlay)
+                ========================================== */}
+                {notificationsOpen && (
+                    <View style={[styles.notificationsOverlay, styles.glass]}>
+                        <SafeAreaView style={{ flex: 1 }}>
+                            <View style={styles.notificationsHeader}>
+                                <Text style={styles.notificationsTitle}>Уведомления</Text>
+                                <View style={styles.notificationsHeaderActions}>
+                                    <TouchableOpacity style={styles.ghostButton} onPress={clearNotifications}>
+                                        <Text style={styles.ghostButtonText}>Удалить все</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={styles.notificationDeleteBtn} onPress={() => removeNotification(item.id)}>
-                                        <Text style={styles.notificationDeleteBtnText}>Удалить</Text>
+                                    <TouchableOpacity style={styles.ghostButton} onPress={() => setNotificationsOpen(false)}>
+                                        <Text style={styles.ghostButtonCloseText}>Закрыть</Text>
                                     </TouchableOpacity>
                                 </View>
-                            )) : (
-                                <View style={styles.emptyInline}><Text style={styles.emptyInlineText}>Уведомлений пока нет.</Text></View>
-                            )}
-                        </ScrollView>
-                    </SafeAreaView>
-                </View>
-            )}
+                            </View>
 
-            {/* ==========================================
-          ГЛОБАЛЬНЫЕ TOAST-УВЕДОМЛЕНИЯ
-          ========================================== */}
-            {(!!notice || !!error) && (
-                <View style={styles.toastStack}>
-                    {!!notice && (
-                        <View style={[styles.toastCard, styles.toastSuccess]}>
-                            <Text style={styles.toastText}>{notice}</Text>
-                            <TouchableOpacity onPress={() => setNotice("")} style={styles.toastCloseClick}><Text style={styles.toastCloseX}>×</Text></TouchableOpacity>
-                        </View>
-                    )}
-                    {!!error && (
-                        <View style={[styles.toastCard, styles.toastError]}>
-                            <Text style={styles.toastText}>{error}</Text>
-                            <TouchableOpacity onPress={() => setError("")} style={styles.toastCloseClick}><Text style={styles.toastCloseX}>×</Text></TouchableOpacity>
-                        </View>
-                    )}
-                </View>
-            )}
+                            <ScrollView style={styles.notificationsList}>
+                                {notifications.length ? notifications.map((item) => (
+                                    <View key={item.id} style={[styles.notificationItem, item.read ? styles.notificationRead : styles.notificationUnread]}>
+                                        <TouchableOpacity
+                                            style={styles.notificationMainClick}
+                                            onPress={() => {
+                                                setExpandedNotificationId((prev) => prev === item.id ? null : item.id);
+                                                markNotificationRead(item.id);
+                                            }}
+                                        >
+                                            <Text style={styles.notificationItemTitle}>Вы получили сообщение от администратора</Text>
+                                            <Text style={styles.notificationTime}>{new Date(item.createdAt).toLocaleString("ru-RU")}</Text>
+                                            {expandedNotificationId === item.id && (
+                                                <Text style={styles.notificationBodyText}>{item.message}</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.notificationDeleteBtn} onPress={() => removeNotification(item.id)}>
+                                            <Text style={styles.notificationDeleteBtnText}>Удалить</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )) : (
+                                    <View style={styles.emptyInline}><Text style={styles.emptyInlineText}>Уведомлений пока нет.</Text></View>
+                                )}
+                            </ScrollView>
+                        </SafeAreaView>
+                    </View>
+                )}
 
-            {/* Модальные окна глобального стейта */}
-            <AppModals {...appViewProps} />
-        </SafeAreaView>
+                {/* ==========================================
+                ГЛОБАЛЬНЫЕ TOAST-УВЕДОМЛЕНИЯ
+                ========================================== */}
+                {(!!notice || !!error) && (
+                    <View style={styles.toastStack}>
+                        {!!notice && (
+                            <View style={[styles.toastCard, styles.toastSuccess]}>
+                                <Text style={styles.toastText}>{notice}</Text>
+                                <TouchableOpacity onPress={() => setNotice("")} style={styles.toastCloseClick}>
+                                    <Text style={styles.toastCloseX}>×</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                        {!!error && (
+                            <View style={[styles.toastCard, styles.toastError]}>
+                                <Text style={styles.toastText}>{error}</Text>
+                                <TouchableOpacity onPress={() => setError("")} style={styles.toastCloseClick}>
+                                    <Text style={styles.toastCloseX}>×</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {/* Модальные окна глобального стейта */}
+                <AppModals {...appViewProps} />
+                <DocumentViewer document={documentViewer} onClose={() => setDocumentViewer(null)} />
+            </SafeAreaView>
         </SafeAreaProvider>
     );
 }
 
 // ==========================================
-// СТИЛИЗАЦИЯ И СИСТЕМНЫЕ ПАЛИТРЫ
+// СТИЛИЗАЦИЯ (остается без изменений)
 // ==========================================
 const styles = StyleSheet.create({
+    // ... все ваши стили остаются теми же
     appShell: {
         flex: 1,
         backgroundColor: "#F2F2F7",
@@ -352,11 +383,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-    bellIcon: {
-        width: 22,
-        height: 22,
-        resizeMode: "contain",
-    },
     badge: {
         position: "absolute",
         top: 2,
@@ -394,15 +420,26 @@ const styles = StyleSheet.create({
     },
     mainPage: {
         flex: 1,
+        paddingBottom: 84,
     },
-
-    // Нижнее меню (Bottom Tab Bar)
     bottomTabBar: {
-        height: 60,
+        position: "absolute",
+        left: 18,
+        right: 18,
+        bottom: 12,
+        height: 64,
         flexDirection: "row",
-        borderTopWidth: 1,
-        borderTopColor: "#E5E5EA",
-        paddingBottom: 4,
+        borderWidth: 1,
+        borderColor: "rgba(0, 0, 0, 0.08)",
+        borderRadius: 32,
+        paddingTop: 8,
+        paddingBottom: 8,
+        paddingHorizontal: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.14,
+        shadowRadius: 28,
+        elevation: 14,
     },
     tabItem: {
         flex: 1,
@@ -410,19 +447,21 @@ const styles = StyleSheet.create({
         alignItems: "center",
         position: "relative",
     },
-    tabLabel: {
-        fontSize: 12,
-        color: "#8E8E93",
-        fontWeight: "500",
+    tabIconPill: {
+        width: 46,
+        height: 42,
+        borderRadius: 21,
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
     },
-    tabLabelActive: {
-        color: "#007AFF",
-        fontWeight: "600",
+    tabIconPillActive: {
+        backgroundColor: "#EAF4FF",
     },
     tabBadge: {
         position: "absolute",
-        top: 8,
-        right: "15%",
+        top: 1,
+        right: 2,
         backgroundColor: "#007AFF",
         borderRadius: 9,
         minWidth: 18,
@@ -436,8 +475,6 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: "bold",
     },
-
-    // Оверлей уведомлений (Заменяет веб-dropdown)
     notificationsOverlay: {
         position: "absolute",
         top: 0,
@@ -533,8 +570,6 @@ const styles = StyleSheet.create({
         color: "#8E8E93",
         fontSize: 14,
     },
-
-    // Глобальные Тосты
     toastStack: {
         position: "absolute",
         top: 70,
@@ -577,8 +612,6 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: "bold",
     },
-
-    // Экран Блокировки
     blockedContainer: {
         flex: 1,
         backgroundColor: "#F2F2F7",

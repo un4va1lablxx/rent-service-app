@@ -2,6 +2,7 @@
   "expo": {
     "name": "mobile-client",
     "slug": "mobile-client",
+    "scheme": "rentservice",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
@@ -9,7 +10,17 @@
     "ios": {
       "supportsTablet": true
     },
-    "android": {
-    }
+    "android": {},
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Приложению нужен доступ к фото, чтобы загрузить фотографии жилья и документы для проверки.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
+    ]
   }
 }

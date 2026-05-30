@@ -362,9 +362,7 @@ export function ProfileScreen(props) {
     const [passportDraft, setPassportDraft] = useState(createInitialPassportDraft);
     const [payoutDraft, setPayoutDraft] = useState({
         payoutBankName: "",
-        payoutAccountNumber: "",
-        payoutCardCvc: "",
-        payoutCardExpiry: ""
+        payoutAccountNumber: ""
     });
 
     const verificationMeta = verificationStatusMeta(profile.verificationStatus);
@@ -397,8 +395,6 @@ export function ProfileScreen(props) {
     const hasSavedPayoutDetails = Boolean(
         profile?.payoutBankName
         && profile?.payoutAccountNumber
-        && profile?.payoutCardCvc
-        && profile?.payoutCardExpiry
     );
     const hasSavedPassportDetails = Boolean(
         profile?.passportCitizenship
@@ -524,15 +520,11 @@ export function ProfileScreen(props) {
     useEffect(() => {
         setPayoutDraft({
             payoutBankName: profile?.payoutBankName || "",
-            payoutAccountNumber: profile?.payoutAccountNumber || "",
-            payoutCardCvc: profile?.payoutCardCvc || "",
-            payoutCardExpiry: profile?.payoutCardExpiry || ""
+            payoutAccountNumber: profile?.payoutAccountNumber || ""
         });
     }, [
         profile?.payoutBankName,
-        profile?.payoutAccountNumber,
-        profile?.payoutCardCvc,
-        profile?.payoutCardExpiry
+        profile?.payoutAccountNumber
     ]);
 
     useEffect(() => {
@@ -1179,33 +1171,6 @@ export function ProfileScreen(props) {
                                                 readOnly={hasSavedPayoutDetails}
                                             />
                                         </label>
-                                        <div className="credentials-meta-row">
-                                            <label className="field">
-                                                <span>CVC</span>
-                                                <input
-                                                    type="password"
-                                                    value={payoutDraft.payoutCardCvc}
-                                                    onChange={(event) => setPayoutDraft((current) => ({
-                                                        ...current,
-                                                        payoutCardCvc: event.target.value
-                                                    }))}
-                                                    placeholder="123"
-                                                    readOnly={hasSavedPayoutDetails}
-                                                />
-                                            </label>
-                                            <label className="field">
-                                                <span>MM/YYYY</span>
-                                                <input
-                                                    value={payoutDraft.payoutCardExpiry}
-                                                    onChange={(event) => setPayoutDraft((current) => ({
-                                                        ...current,
-                                                        payoutCardExpiry: event.target.value
-                                                    }))}
-                                                    placeholder="08/2028"
-                                                    readOnly={hasSavedPayoutDetails}
-                                                />
-                                            </label>
-                                        </div>
                                     </div>
 
                                     {!hasSavedPayoutDetails && (

@@ -11,6 +11,13 @@ export function roleLabel(role) {
     }
 }
 
+export function compactName(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "";
+    if (parts.length === 1) return parts[0];
+    return `${parts[1]} ${parts[0].charAt(0).toUpperCase()}.`;
+}
+
 export function propertyLabel(type) {
     return propertyOptions.find((option) => option.value === type)?.label || "Жилье";
 }

@@ -15,10 +15,8 @@ public record MessageResponse(
         String text,
         Long relatedId,
         String messageType,
-        boolean containsContactDetails,
         boolean read,
         LocalDateTime deliveredAt,
-        LocalDateTime readAt,
         LocalDateTime createdAt
 ) {
 }

@@ -51,10 +51,6 @@ public class Booking {
     @Column(name = "agreed_price", precision = 10, scale = 2)
     private BigDecimal agreedPrice;
 
-    @Column(name = "contact_revealed")
-    @Builder.Default
-    private boolean contactRevealed = false;
-
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 

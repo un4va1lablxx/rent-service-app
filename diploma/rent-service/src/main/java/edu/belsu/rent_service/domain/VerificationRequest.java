@@ -30,7 +30,7 @@ public class VerificationRequest {
 
     @Column(name = "verification_type", nullable = false, length = 30)
     @Builder.Default
-    private String verificationType = "sms";
+    private String verificationType = "owner_verified";
 
     @Column(name = "status", nullable = false)
     @Builder.Default
@@ -38,9 +38,6 @@ public class VerificationRequest {
 
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
-
-    @Column(name = "gosuslugi_id", length = 100)
-    private String gosuslugiId;
 
     @Column(name = "failure_reason", columnDefinition = "TEXT")
     private String failureReason;

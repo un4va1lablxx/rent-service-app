@@ -6,7 +6,6 @@ public record VerificationRequestPayload(
         String passportDocumentUrl,
         String snilsDocumentUrl,
         String egrnDocumentUrl,
-        String gosuslugiId,
         Boolean consentFsspCheck,
         String preferredVideoSlot,
         String note

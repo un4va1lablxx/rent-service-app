@@ -8,6 +8,29 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import DatePicker from "react-native-date-picker";
+
+function parseDateTime(dateValue, timeValue = "12:00") {
+    const today = new Date();
+    const [year, month, day] = String(dateValue || "").split("-").map(Number);
+    const [hours = 12, minutes = 0] = String(timeValue || "12:00").split(":").map(Number);
+    if (!year || !month || !day) {
+        today.setHours(hours || 12, minutes || 0, 0, 0);
+        return today;
+    }
+    return new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
+}
+
+function formatDateValue(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function formatTimeValue(date) {
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
 
 export function AppModals(props) {
     const {
@@ -77,10 +100,6 @@ export function AppModals(props) {
         setFullName,
         password,
         setPassword,
-        smsCode,
-        setSmsCode,
-        debugCode,
-        setDebugCode,
         telegramAuth,
         setTelegramAuth,
         priceMin,
@@ -252,6 +271,24 @@ export function AppModals(props) {
     useEffect(() => {
         setSellerReviewsPage(0);
     }, [sellerProfileModal.open, sellerProfileModal.data?.id]);
+
+    const [viewingPicker, setViewingPicker] = useState({ open: false, mode: "date", date: new Date() });
+    const openViewingPicker = (mode) => {
+        setViewingPicker({
+            open: true,
+            mode,
+            date: parseDateTime(viewingModal.date, viewingModal.time),
+        });
+    };
+
+    const confirmViewingPicker = (date) => {
+        setViewingModal((prev) => ({
+            ...prev,
+            date: viewingPicker.mode === "date" ? formatDateValue(date) : prev.date,
+            time: viewingPicker.mode === "time" ? formatTimeValue(date) : prev.time,
+        }));
+        setViewingPicker((prev) => ({ ...prev, open: false, date }));
+    };
 
     return (
         <>
@@ -673,25 +710,33 @@ export function AppModals(props) {
             {viewingModal.open && (
                 <Modal onClose={() => setViewingModal({ open: false, date: "", time: "" })}>
                     <View style={styles.modalContent}>
+                        <DatePicker
+                            modal
+                            open={viewingPicker.open}
+                            date={viewingPicker.date}
+                            mode={viewingPicker.mode}
+                            locale="ru"
+                            title={viewingPicker.mode === "date" ? "Дата просмотра" : "Время просмотра"}
+                            confirmText="Готово"
+                            cancelText="Отмена"
+                            onConfirm={confirmViewingPicker}
+                            onCancel={() => setViewingPicker((prev) => ({ ...prev, open: false }))}
+                        />
                         <Text style={styles.modalTitle}>Предложить просмотр</Text>
 
-                        <Text style={styles.fieldLabelText}>Дата просмотра (ГГГГ-ММ-ДД)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Например: 2026-06-15"
-                            placeholderTextColor="#999"
-                            value={viewingModal.date}
-                            onChangeText={(text) => setViewingModal(prev => ({ ...prev, date: text }))}
-                        />
+                        <Text style={styles.fieldLabelText}>Дата просмотра</Text>
+                        <TouchableOpacity style={styles.pickerButton} onPress={() => openViewingPicker("date")}>
+                            <Text style={[styles.pickerButtonText, !viewingModal.date && styles.pickerPlaceholder]}>
+                                {viewingModal.date || "Выбрать дату"}
+                            </Text>
+                        </TouchableOpacity>
 
-                        <Text style={styles.fieldLabelText}>Время просмотра (ЧЧ:ММ)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Например: 14:00"
-                            placeholderTextColor="#999"
-                            value={viewingModal.time}
-                            onChangeText={(text) => setViewingModal(prev => ({ ...prev, time: text }))}
-                        />
+                        <Text style={styles.fieldLabelText}>Время просмотра</Text>
+                        <TouchableOpacity style={styles.pickerButton} onPress={() => openViewingPicker("time")}>
+                            <Text style={[styles.pickerButtonText, !viewingModal.time && styles.pickerPlaceholder]}>
+                                {viewingModal.time || "Выбрать время"}
+                            </Text>
+                        </TouchableOpacity>
 
                         <View style={styles.modalActions}>
                             <TouchableOpacity style={styles.secondaryButton} onPress={() => setViewingModal({ open: false, date: "", time: "" })}>
@@ -711,15 +756,16 @@ export function AppModals(props) {
 // Полноценные стили для идеального отображения на экранах iOS и Android
 const styles = StyleSheet.create({
     modalContent: {
-        padding: 20,
+        flex: 1,
+        paddingHorizontal: 2,
+        paddingBottom: 20,
         backgroundColor: '#fff',
-        borderRadius: 12,
     },
     modalTitle: {
-        fontSize: 20,
+        fontSize: 28,
         fontWeight: '700',
         color: '#111',
-        marginBottom: 12,
+        marginBottom: 18,
     },
     modalText: {
         fontSize: 14,
@@ -739,25 +785,44 @@ const styles = StyleSheet.create({
     },
     input: {
         borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 15,
+        borderColor: '#E5E5EA',
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 13,
+        fontSize: 16,
         color: '#111',
         marginBottom: 16,
-        backgroundColor: '#fafafa',
+        backgroundColor: '#F7F7FA',
+    },
+    pickerButton: {
+        minHeight: 48,
+        borderWidth: 1,
+        borderColor: '#E5E5EA',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        justifyContent: 'center',
+        backgroundColor: '#F7F7FA',
+        marginBottom: 16,
+    },
+    pickerButtonText: {
+        color: '#111',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    pickerPlaceholder: {
+        color: '#8E8E93',
+        fontWeight: '500',
     },
     textarea: {
         borderWidth: 1,
         borderColor: '#e0e0e0',
-        borderRadius: 8,
+        borderRadius: 14,
         padding: 12,
-        fontSize: 15,
+        fontSize: 16,
         color: '#111',
         minHeight: 80,
         textAlignVertical: 'top',
-        backgroundColor: '#fafafa',
+        backgroundColor: '#F7F7FA',
         marginBottom: 16,
     },
     textareaCompact: {
@@ -815,14 +880,16 @@ const styles = StyleSheet.create({
     },
     primaryButton: {
         backgroundColor: '#007AFF',
-        borderRadius: 8,
+        borderRadius: 22,
+        minHeight: 48,
         paddingVertical: 12,
+        paddingHorizontal: 18,
         alignItems: 'center',
         justifyContent: 'center',
     },
     primaryButtonCompact: {
         backgroundColor: '#007AFF',
-        borderRadius: 8,
+        borderRadius: 20,
         paddingVertical: 10,
         paddingHorizontal: 16,
         justifyContent: 'center',
@@ -833,8 +900,9 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     secondaryButton: {
-        backgroundColor: '#efefef',
-        borderRadius: 8,
+        backgroundColor: '#F2F2F7',
+        borderRadius: 22,
+        minHeight: 44,
         paddingVertical: 10,
         paddingHorizontal: 16,
         alignItems: 'center',
@@ -847,7 +915,7 @@ const styles = StyleSheet.create({
     },
     dangerButton: {
         backgroundColor: '#FF3B30',
-        borderRadius: 8,
+        borderRadius: 22,
         paddingVertical: 10,
         paddingHorizontal: 16,
         alignItems: 'center',

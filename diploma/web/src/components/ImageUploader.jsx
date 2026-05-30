@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { storage } from "../lib/api";
 
-const MAX_AD_IMAGES = 35;
+const MAX_AD_IMAGES = 10;
 
 export default function ImageUploader({ existingImages = [], onImagesUploaded }) {
     const [images, setImages] = useState(existingImages);
@@ -30,7 +30,7 @@ export default function ImageUploader({ existingImages = [], onImagesUploaded })
         });
 
         try {
-            const response = await fetch("http://localhost:8080/api/upload/photos", {
+            const response = await fetch("http://192.168.0.23:8080/api/upload/photos", {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${storage.getToken()}`

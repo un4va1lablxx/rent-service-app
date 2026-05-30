@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8080";
+  import.meta.env.VITE_API_BASE_URL?.trim() || "http://192.168.0.23:8080";
 
 function resolveWebSocketUrl(path) {
   const baseUrl = new URL(API_BASE_URL);
@@ -37,7 +37,7 @@ async function request(path, options = {}) {
       const data = await response.json();
       message = data.error || data.message || message;
     } catch {
-      // ignore
+      // игнор
     }
     throw new Error(message);
   }
@@ -68,11 +68,6 @@ export const storage = {
 };
 
 export const authApi = {
-  requestSmsCode: (phoneNumber, purpose) =>
-    request("/api/auth/sms-code", {
-      method: "POST",
-      body: JSON.stringify({ phoneNumber, purpose })
-    }),
   register: (payload) =>
     request("/api/auth/register", {
       method: "POST",
@@ -345,8 +340,6 @@ export const adminApi = {
     updateUserVerification: (
         userId,
         verified,
-        smsVerified = false,
-        gosuslugiVerified = false,
         verificationType = null,
         revokeOwnerVerification = false
     ) =>
@@ -354,8 +347,6 @@ export const adminApi = {
             method: "PATCH",
             body: JSON.stringify({
                 verified,
-                smsVerified,
-                gosuslugiVerified,
                 verificationType,
                 revokeOwnerVerification
             })

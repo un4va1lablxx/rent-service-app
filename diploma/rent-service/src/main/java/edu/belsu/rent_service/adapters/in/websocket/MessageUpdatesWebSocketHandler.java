@@ -42,19 +42,6 @@ public class MessageUpdatesWebSocketHandler extends TextWebSocketHandler {
         sessionsByUserId.computeIfAbsent(userId, ignored -> new CopyOnWriteArraySet<>()).add(session);
     }
 
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        unregister(session);
-    }
-
-    @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
-        unregister(session);
-        if (session.isOpen()) {
-            session.close(CloseStatus.SERVER_ERROR);
-        }
-    }
-
     public void sendToUser(Long userId, Map<String, Object> payload) {
         if (userId == null) {
             return;
@@ -76,7 +63,19 @@ public class MessageUpdatesWebSocketHandler extends TextWebSocketHandler {
                 }
             }
         } catch (IOException ignored) {
-            // Ignore malformed payload serialization for realtime hints.
+        }
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        unregister(session);
+    }
+
+    @Override
+    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+        unregister(session);
+        if (session.isOpen()) {
+            session.close(CloseStatus.SERVER_ERROR);
         }
     }
 

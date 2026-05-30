@@ -14,6 +14,9 @@ public record PublicUserProfileResponse(
         String verificationStatus,
         Double landlordRating,
         Integer landlordReviewsCount,
+        Double tenantRating,
+        Integer tenantReviewsCount,
+        String trustLevel,
         List<AdSummaryResponse> ads,
         List<ReviewResponse> reviews
 ) {

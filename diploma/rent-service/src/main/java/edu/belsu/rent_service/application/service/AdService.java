@@ -50,6 +50,7 @@ public class AdService {
     private final FavoriteRepository favoriteRepository;
     private final MessageRepository messageRepository;
     private final AuthenticatedUserService authenticatedUserService;
+    private final UserReviewStatsService userReviewStatsService;
 
     @Value("${file.upload-dir:./uploads}")
     private String uploadDir;
@@ -59,13 +60,15 @@ public class AdService {
                      PhotoRepository photoRepository,
                      FavoriteRepository favoriteRepository,
                      MessageRepository messageRepository,
-                     AuthenticatedUserService authenticatedUserService) {
+                     AuthenticatedUserService authenticatedUserService,
+                     UserReviewStatsService userReviewStatsService) {
         this.adRepository = adRepository;
         this.userRepository = userRepository;
         this.photoRepository = photoRepository;
         this.favoriteRepository = favoriteRepository;
         this.messageRepository = messageRepository;
         this.authenticatedUserService = authenticatedUserService;
+        this.userReviewStatsService = userReviewStatsService;
     }
 
     @Transactional
@@ -87,8 +90,6 @@ public class AdService {
                 .region(request.region().trim())
                 .propertyType(propertyType.code())
                 .rentalType(rentalType.code())
-                .latitude(request.latitude())
-                .longitude(request.longitude())
                 .maxGuests(request.maxGuests())
                 .rooms(request.rooms())
                 .pricePerMonth(request.pricePerMonth())
@@ -127,8 +128,6 @@ public class AdService {
         ad.setRegion(request.region().trim());
         ad.setPropertyType(propertyType.code());
         ad.setRentalType(rentalType.code());
-        ad.setLatitude(request.latitude());
-        ad.setLongitude(request.longitude());
         ad.setRooms(request.rooms());
         ad.setPricePerMonth(request.pricePerMonth());
         ad.setPricePerDay(request.pricePerDay());
@@ -138,8 +137,6 @@ public class AdService {
         ad.setTotalFloors(request.totalFloors());
         ad.setModerationStatus("pending");
         ad.setModerationComment(null);
-        ad.setAutoModerationFlagged(false);
-        ad.setDuplicatePhotoDetected(false);
         //applyRentalTypeRules(ad);
 
         Ad savedAd = adRepository.save(ad);
@@ -243,8 +240,6 @@ public class AdService {
         ad.setCity("Удалено");
         ad.setDistrict(null);
         ad.setRegion("Удалено");
-        ad.setLatitude(null);
-        ad.setLongitude(null);
         ad.setRooms(null);
         ad.setPricePerMonth(null);
         ad.setPricePerDay(null);
@@ -303,15 +298,16 @@ public class AdService {
 
     private AdSummaryResponse mapToSummary(Ad ad) {
         List<String> photoUrls = getPhotoUrls(ad.getId());
+        UserReviewStatsService.UserReviewStats stats = userReviewStatsService.getStats(ad.getUser().getId());
         return AdSummaryResponse.builder()
                 .id(ad.getId())
                 .ownerId(ad.getUser().getId())
                 .title(ad.getTitle())
                 .userFullName(ad.getUser().getFullName())
                 .ownerAvatarUrl(ad.getUser().getAvatarUrl())
-                .ownerRating(ad.getUser().getLandlordRating())
-                .ownerReviewsCount(ad.getUser().getLandlordReviewsCount())
-                .ownerTrustLevel(ad.getUser().getTrustLevel())
+                .ownerRating(stats.landlordRating())
+                .ownerReviewsCount(stats.landlordReviewsCount())
+                .ownerTrustLevel(stats.trustLevel())
                 .ownerVerificationStatus(ad.getUser().getVerificationStatus())
                 .userPhone(ad.getUser().getPhoneNumber())
                 .description(ad.getDescription())
@@ -327,7 +323,7 @@ public class AdService {
                 .area(ad.getArea())
                 .moderationStatus(ad.getModerationStatus())
                 .active(ad.isActive())
-                .duplicatePhotoDetected(Boolean.TRUE.equals(ad.getDuplicatePhotoDetected()))
+                .duplicatePhotoDetected(false)
                 .viewsCount(ad.getViewsCount())
                 .primaryPhotoUrl(photoUrls.isEmpty() ? null : photoUrls.get(0))
                 .photoUrls(photoUrls)
@@ -338,14 +334,15 @@ public class AdService {
 
     private AdDetailsResponse mapToDetails(Ad ad, User owner, boolean includePrivateContact) {
         List<String> photoUrls = getPhotoUrls(ad.getId());
+        UserReviewStatsService.UserReviewStats stats = userReviewStatsService.getStats(owner.getId());
         return AdDetailsResponse.builder()
                 .id(ad.getId())
                 .ownerId(owner.getId())
                 .ownerName(owner.getFullName())
                 .ownerAvatarUrl(owner.getAvatarUrl())
-                .ownerRating(owner.getLandlordRating())
-                .ownerReviewsCount(owner.getLandlordReviewsCount())
-                .ownerTrustLevel(owner.getTrustLevel())
+                .ownerRating(stats.landlordRating())
+                .ownerReviewsCount(stats.landlordReviewsCount())
+                .ownerTrustLevel(stats.trustLevel())
                 .ownerVerificationStatus(owner.getVerificationStatus())
                 .ownerPhoneNumber(includePrivateContact ? owner.getPhoneNumber() : null)
                 .title(ad.getTitle())
@@ -356,8 +353,8 @@ public class AdService {
                 .region(ad.getRegion())
                 .propertyType(ad.getPropertyType())
                 .rentalType(ad.getRentalType())
-                .latitude(ad.getLatitude())
-                .longitude(ad.getLongitude())
+                .latitude(null)
+                .longitude(null)
                 .rooms(ad.getRooms())
                 .pricePerMonth(ad.getPricePerMonth())
                 .pricePerDay(ad.getPricePerDay())
@@ -368,8 +365,8 @@ public class AdService {
                 .moderationStatus(ad.getModerationStatus())
                 .moderationComment(ad.getModerationComment())
                 .active(ad.isActive())
-                .autoModerationFlagged(Boolean.TRUE.equals(ad.getAutoModerationFlagged()))
-                .duplicatePhotoDetected(Boolean.TRUE.equals(ad.getDuplicatePhotoDetected()))
+                .autoModerationFlagged(false)
+                .duplicatePhotoDetected(false)
                 .viewsCount(ad.getViewsCount())
                 .favoritesCount(favoriteRepository.countByAdId(ad.getId()))
                 .messagesCount(messageRepository.countByAdId(ad.getId()))
@@ -422,8 +419,6 @@ public class AdService {
                 .region(request.region().trim())
                 .propertyType(propertyType.code())
                 .rentalType(rentalType.code())
-                .latitude(request.latitude())
-                .longitude(request.longitude())
                 .rooms(request.rooms())
                 .pricePerMonth(request.pricePerMonth())
                 .pricePerDay(request.pricePerDay())
@@ -467,14 +462,10 @@ public class AdService {
                 .limit(10)
                 .toList();
 
-        boolean hasDuplicates = false;
         for (int i = 0; i < safeUrls.size(); i++) {
             String url = safeUrls.get(i);
             String hash = buildPhotoHash(url);
             boolean duplicateDetected = photoRepository.existsByPhotoHash(hash);
-            if (duplicateDetected) {
-                hasDuplicates = true;
-            }
 
             Photo photo = Photo.builder()
                     .ad(ad)
@@ -486,9 +477,6 @@ public class AdService {
                     .build();
             photoRepository.save(photo);
         }
-
-        ad.setDuplicatePhotoDetected(hasDuplicates);
-        adRepository.save(ad);
     }
 
     private String buildPhotoHash(String photoUrl) {

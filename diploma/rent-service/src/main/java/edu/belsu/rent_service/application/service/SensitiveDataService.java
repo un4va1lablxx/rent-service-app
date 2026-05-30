@@ -54,7 +54,7 @@ public class SensitiveDataService {
             byte[] payload = new byte[IV_LENGTH + encrypted.length];
             System.arraycopy(iv, 0, payload, 0, IV_LENGTH);
             System.arraycopy(encrypted, 0, payload, IV_LENGTH, encrypted.length);
-            return Base64.getEncoder().encodeToString(payload);
+            return Base64.getEncoder().withoutPadding().encodeToString(payload);
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to encrypt sensitive data", exception);
         }
@@ -66,7 +66,7 @@ public class SensitiveDataService {
         }
 
         try {
-            byte[] payload = Base64.getDecoder().decode(value);
+            byte[] payload = Base64.getDecoder().decode(restoreBase64Padding(value));
             if (payload.length <= IV_LENGTH) {
                 return null;
             }
@@ -80,5 +80,49 @@ public class SensitiveDataService {
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to decrypt sensitive data", exception);
         }
+    }
+
+    public String encryptCardNumber(String cardNumber) {
+        if (!StringUtils.hasText(cardNumber)) {
+            return null;
+        }
+        String digits = cardNumber.replaceAll("\\s+", "");
+        if (digits.length() < 4) {
+            return encrypt(digits);
+        }
+        return encrypt(digits) + digits.substring(digits.length() - 4);
+    }
+
+    public String decryptCardNumberOrOriginal(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            if (value.length() > 4) {
+                return decrypt(value.substring(0, value.length() - 4));
+            }
+            return decrypt(value);
+        } catch (IllegalStateException ignored) {
+            return value;
+        }
+    }
+
+    public String decryptOrOriginal(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return decrypt(value);
+        } catch (IllegalStateException ignored) {
+            return value;
+        }
+    }
+
+    private String restoreBase64Padding(String value) {
+        int remainder = value.length() % 4;
+        if (remainder == 0) {
+            return value;
+        }
+        return value + "=".repeat(4 - remainder);
     }
 }

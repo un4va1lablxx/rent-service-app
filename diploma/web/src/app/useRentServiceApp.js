@@ -105,8 +105,6 @@ export function useRentServiceApp() {
     const [phoneNumber, setPhoneNumber] = useState("+7");
     const [fullName, setFullName] = useState("");
     const [password, setPassword] = useState("");
-    const [smsCode, setSmsCode] = useState("");
-    const [debugCode, setDebugCode] = useState("");
     const [telegramAuth, setTelegramAuth] = useState(null);
     const [priceMin, setPriceMin] = useState("");
     const [priceMax, setPriceMax] = useState("");
@@ -402,6 +400,37 @@ export function useRentServiceApp() {
         }
     }, [profile]);
 
+    useEffect(() => {
+        if (!profile?.id) return;
+
+        const params = new URLSearchParams(window.location.search);
+        const chatAdId = params.get("chatAdId");
+        const sellerId = params.get("sellerId");
+        const appLink = params.get("appLink");
+        const openMobile = params.get("openMobile") === "1";
+        const requestKey = `${chatAdId || ""}:${sellerId || ""}`;
+
+        if (!chatAdId || !sellerId || sessionStorage.getItem("rent-chat-link-opened") === requestKey) {
+            return;
+        }
+
+        sessionStorage.setItem("rent-chat-link-opened", requestKey);
+
+        const isMobileBrowser = /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+        if (openMobile && appLink && isMobileBrowser) {
+            window.location.href = appLink;
+        }
+
+        openDialogFromAd({
+            id: Number(chatAdId),
+            ownerId: Number(sellerId),
+            title: params.get("adTitle") || "Объявление"
+        });
+
+        const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+        window.history.replaceState({}, "", cleanUrl);
+    }, [profile?.id]);
+
     async function bootstrap() {
         if (!storage.getToken()) {
             setBootstrapping(false);
@@ -435,7 +464,7 @@ export function useRentServiceApp() {
     async function sendTelegramCode(username) {
         try {
             setLoadingMap(prev => ({ ...prev, 'telegram': true }));
-            const response = await fetch('http://localhost:8080/api/telegram/send-code', {
+            const response = await fetch('http://192.168.0.23:8080/api/telegram/send-code', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -461,7 +490,7 @@ export function useRentServiceApp() {
 
     async function verifyTelegramCode(code) {
         try {
-            const response = await fetch('http://localhost:8080/api/telegram/verify', {
+            const response = await fetch('http://192.168.0.23:8080/api/telegram/verify', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -734,7 +763,6 @@ export function useRentServiceApp() {
                 setTelegramAuth(response);
                 return;
             }
-            // Логин
             const response = await authApi.login({
                 phoneNumber: phoneNumber.trim(),
                 password: password.trim()
@@ -749,7 +777,6 @@ export function useRentServiceApp() {
                 setError(msg);
                 return;
             }
-            // Разделяем самые частые ошибки входа на понятные сообщения.
             if (msg.toLowerCase().includes("не найден") || msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("does not exist")) {
                 setError("Пользователь с таким номером телефона не существует");
             } else if (msg.toLowerCase().includes("пароль") || msg.toLowerCase().includes("password") || msg.toLowerCase().includes("invalid")) {
@@ -1213,9 +1240,7 @@ export function useRentServiceApp() {
             setBusy("save-payout-details", true);
             const payload = payloadOverride || {
                 payoutBankName: profile?.payoutBankName || "",
-                payoutAccountNumber: profile?.payoutAccountNumber || "",
-                payoutCardCvc: profile?.payoutCardCvc || "",
-                payoutCardExpiry: profile?.payoutCardExpiry || ""
+                payoutAccountNumber: profile?.payoutAccountNumber || ""
             };
             const updated = await authApi.updateMyPaymentDetails(payload);
             setProfile(updated);
@@ -1532,8 +1557,6 @@ export function useRentServiceApp() {
             await adminApi.updateUserVerification(
                 user.id,
                 !isRemoving,
-                false,
-                false,
                 isRemoving ? verificationType : "owner_verified",
                 isRemoving ? revokeOwnerVerification : false
             );
@@ -1648,10 +1671,6 @@ export function useRentServiceApp() {
         setFullName,
         password,
         setPassword,
-        smsCode,
-        setSmsCode,
-        debugCode,
-        setDebugCode,
         telegramAuth,
         setTelegramAuth,
         priceMin,
@@ -1792,5 +1811,3 @@ export function useRentServiceApp() {
         confirmReject
     };
 }
-
-

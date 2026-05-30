@@ -26,9 +26,9 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     @Modifying
     @Transactional
-    @Query("""
+@Query("""
 UPDATE Message m 
-SET m.read = true, m.readAt = CURRENT_TIMESTAMP 
+SET m.read = true
 WHERE m.toUser.id = :userId 
 AND m.ad.id = :adId 
 AND m.fromUser.id = :otherUserId

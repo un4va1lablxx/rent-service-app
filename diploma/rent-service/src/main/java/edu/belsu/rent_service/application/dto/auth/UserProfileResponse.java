@@ -26,11 +26,7 @@ public record UserProfileResponse(
         String passportRegistrationAddress,
         String payoutBankName,
         String payoutAccountNumber,
-        String payoutCardCvc,
-        String payoutCardExpiry,
         boolean verified,
-        boolean smsVerified,
-        boolean gosuslugiVerified,
         boolean blocked
 ) {
 }

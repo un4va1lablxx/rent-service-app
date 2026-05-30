@@ -1,12 +1,12 @@
 package edu.belsu.rent_service.application.service;
 
-import edu.belsu.rent_service.domain.User;
 import edu.belsu.rent_service.application.dto.auth.UserProfileResponse;
 import edu.belsu.rent_service.application.dto.user.UserAvatarRequest;
 import edu.belsu.rent_service.application.dto.user.UserPassportDetailsRequest;
 import edu.belsu.rent_service.application.dto.user.UserPaymentDetailsRequest;
 import edu.belsu.rent_service.application.dto.user.UserRoleRequest;
 import edu.belsu.rent_service.application.exception.ApiException;
+import edu.belsu.rent_service.domain.User;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,13 +18,16 @@ public class UserProfileService {
     private final AuthenticatedUserService authenticatedUserService;
     private final RoleService roleService;
     private final SensitiveDataService sensitiveDataService;
+    private final UserReviewStatsService userReviewStatsService;
 
     public UserProfileService(AuthenticatedUserService authenticatedUserService,
                               RoleService roleService,
-                              SensitiveDataService sensitiveDataService) {
+                              SensitiveDataService sensitiveDataService,
+                              UserReviewStatsService userReviewStatsService) {
         this.authenticatedUserService = authenticatedUserService;
         this.roleService = roleService;
         this.sensitiveDataService = sensitiveDataService;
+        this.userReviewStatsService = userReviewStatsService;
     }
 
     @Transactional
@@ -39,32 +42,21 @@ public class UserProfileService {
         User user = authenticatedUserService.getCurrentUser(authentication);
         String bankName = request == null ? null : normalizeOptional(request.payoutBankName());
         String accountNumber = request == null ? null : normalizeOptional(request.payoutAccountNumber());
-        String cardCvc = request == null ? null : normalizeOptional(request.payoutCardCvc());
-        String cardExpiry = request == null ? null : normalizeOptional(request.payoutCardExpiry());
 
         if (!StringUtils.hasText(bankName)) {
             throw new ApiException("Укажите банк для зачисления");
         }
         if (!StringUtils.hasText(accountNumber)) {
-            throw new ApiException("Укажите номер счета или карты для зачисления");
+            throw new ApiException("Укажите номер карты для зачисления");
         }
-        if (!StringUtils.hasText(cardCvc)) {
-            throw new ApiException("Укажите CVC");
-        }
-        if (!cardCvc.matches("\\d{3,4}")) {
-            throw new ApiException("CVC должен содержать 3 или 4 цифры");
-        }
-        if (!StringUtils.hasText(cardExpiry)) {
-            throw new ApiException("Укажите срок действия карты");
-        }
-        if (!cardExpiry.matches("(0[1-9]|1[0-2])/[0-9]{4}")) {
-            throw new ApiException("Срок действия карты должен быть в формате MM/YYYY");
+
+        String normalizedDigits = accountNumber.replaceAll("\\s+", "");
+        if (!normalizedDigits.matches("\\d{16,19}")) {
+            throw new ApiException("Номер карты должен содержать от 16 до 19 цифр");
         }
 
         user.setPayoutBankName(bankName);
-        user.setPayoutAccountNumber(accountNumber);
-        user.setPayoutCardCvc(cardCvc);
-        user.setPayoutCardExpiry(cardExpiry);
+        user.setPayoutAccountNumber(sensitiveDataService.encryptCardNumber(normalizedDigits));
         return mapUser(user);
     }
 
@@ -73,8 +65,6 @@ public class UserProfileService {
         User user = authenticatedUserService.getCurrentUser(authentication);
         user.setPayoutBankName(null);
         user.setPayoutAccountNumber(null);
-        user.setPayoutCardCvc(null);
-        user.setPayoutCardExpiry(null);
         return mapUser(user);
     }
 
@@ -140,6 +130,7 @@ public class UserProfileService {
     }
 
     private UserProfileResponse mapUser(User user) {
+        UserReviewStatsService.UserReviewStats stats = userReviewStatsService.getStats(user.getId());
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .phoneNumber(user.getPhoneNumber())
@@ -149,25 +140,21 @@ public class UserProfileService {
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
                 .verificationStatus(user.getVerificationStatus())
-                .rating(user.getRating())
-                .reviewsCount(user.getReviewsCount())
-                .landlordRating(user.getLandlordRating())
-                .landlordReviewsCount(user.getLandlordReviewsCount())
-                .tenantRating(user.getTenantRating())
-                .tenantReviewsCount(user.getTenantReviewsCount())
-                .trustLevel(user.getTrustLevel())
+                .rating(stats.rating())
+                .reviewsCount(stats.reviewsCount())
+                .landlordRating(stats.landlordRating())
+                .landlordReviewsCount(stats.landlordReviewsCount())
+                .tenantRating(stats.tenantRating())
+                .tenantReviewsCount(stats.tenantReviewsCount())
+                .trustLevel(stats.trustLevel())
                 .passportCitizenship(sensitiveDataService.decrypt(user.getPassportCitizenshipEncrypted()))
                 .passportNumber(sensitiveDataService.decrypt(user.getPassportNumberEncrypted()))
                 .passportIssuedBy(sensitiveDataService.decrypt(user.getPassportIssuedByEncrypted()))
                 .passportIssuedAt(sensitiveDataService.decrypt(user.getPassportIssuedAtEncrypted()))
                 .passportRegistrationAddress(sensitiveDataService.decrypt(user.getPassportRegistrationAddressEncrypted()))
                 .payoutBankName(user.getPayoutBankName())
-                .payoutAccountNumber(user.getPayoutAccountNumber())
-                .payoutCardCvc(user.getPayoutCardCvc())
-                .payoutCardExpiry(user.getPayoutCardExpiry())
-                .verified(user.isVerified())
-                .smsVerified(user.isSmsVerified())
-                .gosuslugiVerified(user.isGosuslugiVerified())
+                .payoutAccountNumber(sensitiveDataService.decryptCardNumberOrOriginal(user.getPayoutAccountNumber()))
+                .verified(userReviewStatsService.isVerified(user.getVerificationStatus()))
                 .blocked(user.isBlocked())
                 .build();
     }

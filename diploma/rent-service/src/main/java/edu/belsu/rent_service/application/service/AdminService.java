@@ -32,7 +32,8 @@ public class AdminService {
     private final AdService adService;
     private final AuthenticatedUserService authenticatedUserService;
     private final SensitiveDataService sensitiveDataService;
-    private final AdminNotificationService adminNotificationService;
+    private final NotificationService notificationService;
+    private final UserReviewStatsService userReviewStatsService;
 
     public AdminService(UserRepository userRepository,
                          AdRepository adRepository,
@@ -41,7 +42,8 @@ public class AdminService {
                          AdService adService,
                          AuthenticatedUserService authenticatedUserService,
                          SensitiveDataService sensitiveDataService,
-                         AdminNotificationService adminNotificationService) {
+                         NotificationService notificationService,
+                         UserReviewStatsService userReviewStatsService) {
         this.userRepository = userRepository;
         this.adRepository = adRepository;
         this.messageRepository = messageRepository;
@@ -49,7 +51,8 @@ public class AdminService {
         this.adService = adService;
         this.authenticatedUserService = authenticatedUserService;
         this.sensitiveDataService = sensitiveDataService;
-        this.adminNotificationService = adminNotificationService;
+        this.notificationService = notificationService;
+        this.userReviewStatsService = userReviewStatsService;
     }
 
     @Transactional(readOnly = true)
@@ -70,7 +73,7 @@ public class AdminService {
         User user = getUser(userId);
         user.setBlocked(request.blocked());
         user.setBlockReason(request.blocked() ? request.reason() : null);
-        adminNotificationService.notifyUser(
+        notificationService.notifyUser(
                 user.getId(),
                 "Вы получили сообщение от администратора",
                 request.blocked()
@@ -86,14 +89,11 @@ public class AdminService {
                                                       Authentication authentication) {
         User user = getUser(userId);
         if (request.verified()) {
-            user.setVerified(true);
-            user.setSmsVerified(request.smsVerified());
-            user.setGosuslugiVerified(request.gosuslugiVerified());
             user.setVerificationStatus("owner_verified");
             if (!"admin".equalsIgnoreCase(user.getRole())) {
                 user.setRole("landlord");
             }
-            adminNotificationService.notifyUser(
+            notificationService.notifyUser(
                     user.getId(),
                     "Вы получили сообщение от администратора",
                     "Ваша верификация подтверждена администратором."
@@ -109,21 +109,17 @@ public class AdminService {
                 boolean revokeOwnerVerification = Boolean.TRUE.equals(request.revokeOwnerVerification());
                 if (revokeOwnerVerification) {
                     user.setVerificationStatus("basic_verified");
-                    user.setVerified(false);
-                    user.setSmsVerified(false);
-                    user.setGosuslugiVerified(false);
                     if (!"admin".equalsIgnoreCase(user.getRole())) {
                         user.setRole("user");
                     }
-                    adminNotificationService.notifyUser(
+                    notificationService.notifyUser(
                             user.getId(),
                             "Вы получили сообщение от администратора",
                             "С вас сняты статусы «Надежный партнер» и «Подтвержденный собственник»."
                     );
                 } else {
                     user.setVerificationStatus("owner_verified");
-                    user.setVerified(true);
-                    adminNotificationService.notifyUser(
+                    notificationService.notifyUser(
                             user.getId(),
                             "Вы получили сообщение от администратора",
                             "С вас снят статус «Надежный партнер»."
@@ -131,13 +127,10 @@ public class AdminService {
                 }
             } else {
                 user.setVerificationStatus("basic_verified");
-                user.setVerified(false);
-                user.setSmsVerified(false);
-                user.setGosuslugiVerified(false);
                 if (!"admin".equalsIgnoreCase(user.getRole())) {
                     user.setRole("user");
                 }
-                adminNotificationService.notifyUser(
+                notificationService.notifyUser(
                         user.getId(),
                         "Вы получили сообщение от администратора",
                         "С вас снят статус «Подтвержденный собственник»."
@@ -193,7 +186,7 @@ public class AdminService {
             int warningsCount = owner.getWarningsCount() == null ? 0 : owner.getWarningsCount();
             warningsCount += 1;
             owner.setWarningsCount(warningsCount);
-            adminNotificationService.notifyUser(
+            notificationService.notifyUser(
                     owner.getId(),
                     "Вы получили сообщение от администратора",
                     "Ваше объявление отклонено. Причина: " + (request.comment() == null ? "не указана" : request.comment())
@@ -202,7 +195,7 @@ public class AdminService {
             if (warningsCount >= 3) {
                 owner.setBlocked(true);
                 owner.setBlockReason("Аккаунт заблокирован автоматически после 3 отклонённых объявлений");
-                adminNotificationService.notifyUser(
+                notificationService.notifyUser(
                         owner.getId(),
                         "Вы получили сообщение от администратора",
                         "Ваш аккаунт автоматически заблокирован после 3 предупреждений."
@@ -231,6 +224,7 @@ public class AdminService {
     }
 
     private UserProfileResponse mapUser(User user) {
+        UserReviewStatsService.UserReviewStats stats = userReviewStatsService.getStats(user.getId());
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .phoneNumber(user.getPhoneNumber())
@@ -240,25 +234,21 @@ public class AdminService {
                 .telegramId(user.getTelegramId())
                 .telegramUsername(user.getTelegramUsername())
                 .verificationStatus(user.getVerificationStatus())
-                .rating(user.getRating())
-                .reviewsCount(user.getReviewsCount())
-                .landlordRating(user.getLandlordRating())
-                .landlordReviewsCount(user.getLandlordReviewsCount())
-                .tenantRating(user.getTenantRating())
-                .tenantReviewsCount(user.getTenantReviewsCount())
-                .trustLevel(user.getTrustLevel())
+                .rating(stats.rating())
+                .reviewsCount(stats.reviewsCount())
+                .landlordRating(stats.landlordRating())
+                .landlordReviewsCount(stats.landlordReviewsCount())
+                .tenantRating(stats.tenantRating())
+                .tenantReviewsCount(stats.tenantReviewsCount())
+                .trustLevel(stats.trustLevel())
                 .passportCitizenship(sensitiveDataService.decrypt(user.getPassportCitizenshipEncrypted()))
                 .passportNumber(sensitiveDataService.decrypt(user.getPassportNumberEncrypted()))
                 .passportIssuedBy(sensitiveDataService.decrypt(user.getPassportIssuedByEncrypted()))
                 .passportIssuedAt(sensitiveDataService.decrypt(user.getPassportIssuedAtEncrypted()))
                 .passportRegistrationAddress(sensitiveDataService.decrypt(user.getPassportRegistrationAddressEncrypted()))
                 .payoutBankName(user.getPayoutBankName())
-                .payoutAccountNumber(user.getPayoutAccountNumber())
-                .payoutCardCvc(user.getPayoutCardCvc())
-                .payoutCardExpiry(user.getPayoutCardExpiry())
-                .verified(user.isVerified())
-                .smsVerified(user.isSmsVerified())
-                .gosuslugiVerified(user.isGosuslugiVerified())
+                .payoutAccountNumber(sensitiveDataService.decryptCardNumberOrOriginal(user.getPayoutAccountNumber()))
+                .verified(userReviewStatsService.isVerified(user.getVerificationStatus()))
                 .blocked(user.isBlocked())
                 .build();
     }

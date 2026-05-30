@@ -1,11 +1,14 @@
 import React, { useState, useRef } from "react";
 import {
     Animated,
+    KeyboardAvoidingView,
     Modal as RNModal,
-    Pressable,
+    Platform,
+    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
+    useWindowDimensions,
     View
 } from "react-native";
 // Используем стандартную библиотеку для работы с SVG в мобильной разработке
@@ -54,17 +57,28 @@ export function Fact({ label, value }) {
 // 4. КОМПОНЕНТ: Modal (Нативное модальное окно)
 // ==========================================
 export function Modal({ children, onClose, wide = false }) {
+    const { width } = useWindowDimensions();
     return (
         <RNModal
-            transparent={true}
+            transparent={false}
             visible={true}
-            animationType="fade"
+            animationType="slide"
             onRequestClose={onClose} // Корректная обработка аппаратной кнопки «Назад» на Android
         >
-            {/* Задний полупрозрачный фон */}
-            <Pressable style={styles.modalBackdrop} onPress={onClose}>
-                {/* Карточка модалки. Внутренний Pressable без колбэка предотвращает закрытие при клике на контент */}
-                <Pressable style={[styles.modalCard, styles.glass, wide ? styles.modalWide : null]}>
+            <KeyboardAvoidingView
+                style={styles.modalKeyboard}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+            >
+            <SafeAreaView style={styles.modalBackdrop}>
+                <View
+                    style={[
+                        styles.modalCard,
+                        wide ? styles.modalWide : null,
+                        {
+                            width: Math.min(width, wide ? 620 : 430),
+                        }
+                    ]}
+                >
 
                     {/* Кнопка закрытия с увеличенной Touch-зоной для удобства пальцев */}
                     <TouchableOpacity
@@ -77,8 +91,9 @@ export function Modal({ children, onClose, wide = false }) {
                     </TouchableOpacity>
 
                     {children}
-                </Pressable>
-            </Pressable>
+                </View>
+            </SafeAreaView>
+            </KeyboardAvoidingView>
         </RNModal>
     );
 }
@@ -227,27 +242,35 @@ const styles = StyleSheet.create({
     },
 
     // Стили Modal
+    modalKeyboard: {
+        flex: 1,
+    },
     modalBackdrop: {
         flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.4)", // затемнение экрана
-        justifyContent: "center",
+        backgroundColor: "#F2F2F7",
+        justifyContent: "flex-start",
         alignItems: "center",
-        padding: 20,
+        paddingHorizontal: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
     },
     modalCard: {
-        width: "92%",
-        maxWidth: 340,
-        borderRadius: 20,
-        padding: 20,
+        borderRadius: 0,
+        flex: 1,
+        backgroundColor: "#FFFFFF",
+        paddingHorizontal: 20,
+        paddingTop: 56,
+        paddingBottom: 16,
         position: "relative",
+        overflow: "visible",
     },
     modalWide: {
         width: "100%",
-        maxWidth: 400,
+        maxWidth: 620,
     },
     modalCloseButton: {
         position: "absolute",
-        top: 12,
+        top: 8,
         right: 12,
         width: 44, // Соответствие стандартам Apple/Google на размер тач-зоны
         height: 44,

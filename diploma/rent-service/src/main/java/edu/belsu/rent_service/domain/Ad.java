@@ -55,12 +55,6 @@ public class Ad {
     @Builder.Default
     private String rentalType = "long_term";
 
-    @Column(name = "latitude")
-    private Double latitude;
-
-    @Column(name = "longitude")
-    private Double longitude;
-
     @Column(name = "rooms")
     private Integer rooms;
 
@@ -92,14 +86,6 @@ public class Ad {
 
     @Column(name = "moderation_comment", columnDefinition = "TEXT")
     private String moderationComment;
-
-    @Column(name = "auto_moderation_flagged")
-    @Builder.Default
-    private Boolean autoModerationFlagged = false;
-
-    @Column(name = "duplicate_photo_detected")
-    @Builder.Default
-    private Boolean duplicatePhotoDetected = false;
 
     @Column(name = "views_count")
     @Builder.Default

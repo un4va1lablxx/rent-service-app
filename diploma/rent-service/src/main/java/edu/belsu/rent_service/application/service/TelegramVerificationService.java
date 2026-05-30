@@ -93,7 +93,6 @@ public class TelegramVerificationService {
                 .orElseThrow(() -> new ApiException("Пользователь не найден"));
 
         user.setTelegramId(verification.getChatId());
-        user.setPreferredMessenger("telegram");
         userRepository.save(user);
 
         // Удаляем использованный код

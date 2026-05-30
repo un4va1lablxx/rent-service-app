@@ -33,7 +33,7 @@ public class VerificationService {
     private final UserRepository userRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final SensitiveDataService sensitiveDataService;
-    private final AdminNotificationService adminNotificationService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     public VerificationService(VerificationRequestRepository verificationRequestRepository,
@@ -41,13 +41,13 @@ public class VerificationService {
                                UserRepository userRepository,
                                AuthenticatedUserService authenticatedUserService,
                                SensitiveDataService sensitiveDataService,
-                               AdminNotificationService adminNotificationService) {
+                               NotificationService notificationService) {
         this.verificationRequestRepository = verificationRequestRepository;
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.authenticatedUserService = authenticatedUserService;
         this.sensitiveDataService = sensitiveDataService;
-        this.adminNotificationService = adminNotificationService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -66,7 +66,6 @@ public class VerificationService {
         Map<String, Object> requestData = new LinkedHashMap<>();
         Map<String, Object> responseData = new LinkedHashMap<>();
         requestData.put("note", normalizeOptional(payload.note()));
-        requestData.put("gosuslugiId", normalizeOptional(payload.gosuslugiId()));
 
         if ("owner_verified".equals(type)) {
             validateOwnerVerification(user, payload, requestData, responseData);
@@ -79,7 +78,6 @@ public class VerificationService {
                 .verificationType(type)
                 .status("pending")
                 .phoneNumber(user.getPhoneNumber())
-                .gosuslugiId(normalizeOptional(payload.gosuslugiId()))
                 .requestData(toJson(requestData))
                 .responseData(toJson(responseData))
                 .build();
@@ -149,21 +147,19 @@ public class VerificationService {
         User user = verificationRequest.getUser();
         if ("approved".equals(status)) {
             if ("owner_verified".equals(verificationRequest.getVerificationType())) {
-                user.setVerified(true);
-                user.setSmsVerified(true);
                 user.setVerificationStatus("owner_verified");
                 promoteToLandlordIfNeeded(user);
             } else if ("trusted_partner".equals(verificationRequest.getVerificationType())) {
                 user.setVerificationStatus("trusted_partner");
                 promoteToLandlordIfNeeded(user);
             }
-            adminNotificationService.notifyUser(
+            notificationService.notifyUser(
                     user.getId(),
                     "Вы получили сообщение от администратора",
                     "Ваша заявка на верификацию «" + ("owner_verified".equals(verificationRequest.getVerificationType()) ? "Подтвержденный собственник" : "Надежный партнер") + "» одобрена."
             );
         } else if ("rejected".equals(status)) {
-            adminNotificationService.notifyUser(
+            notificationService.notifyUser(
                     user.getId(),
                     "Вы получили сообщение от администратора",
                     "Ваша заявка на верификацию отклонена. Причина: " + (verificationRequest.getFailureReason() == null ? "не указана" : verificationRequest.getFailureReason())
@@ -178,9 +174,6 @@ public class VerificationService {
                                            VerificationRequestPayload payload,
                                            Map<String, Object> requestData,
                                            Map<String, Object> responseData) {
-        if (!user.isSmsVerified()) {
-            throw new ApiException("Сначала подтвердите номер телефона");
-        }
         String cadastralNumber = requireText(payload.cadastralNumber(), "Укажите кадастровый номер");
         if (!CADASTRAL_PATTERN.matcher(cadastralNumber).matches()) {
             throw new ApiException("Кадастровый номер должен быть в формате 00:00:0000000:000");
@@ -231,7 +224,6 @@ public class VerificationService {
                 .verificationType(request.getVerificationType())
                 .status(request.getStatus())
                 .cadastralNumber(asText(requestData.get("cadastralNumber")))
-                .gosuslugiId(request.getGosuslugiId())
                 .failureReason(request.getFailureReason())
                 .requestData(request.getRequestData())
                 .responseData(request.getResponseData())

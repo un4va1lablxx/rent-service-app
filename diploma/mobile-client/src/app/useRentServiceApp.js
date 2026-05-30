@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 // Заменяем window.open на нативный модуль для работы со ссылками
 import { Linking } from "react-native";
-import { adminApi, adsApi, authApi, favoritesApi, messagesApi, messagesSocketApi, notificationsApi, storage, usersApi } from "../lib/api";
+import { adminApi, adsApi, assetUrl, authApi, favoritesApi, messagesApi, messagesSocketApi, notificationsApi, storage, usersApi } from "../lib/api";
 import { initialDraft, navItems } from "../shared/appConstants";
 import { dialogKey, normalizeInteger, normalizeNumber } from "../shared/formUtils";
 import { calculateRentalDuration, formatMoscowDateWords } from "../shared/time";
@@ -116,8 +116,6 @@ export function useRentServiceApp() {
     const [phoneNumber, setPhoneNumber] = useState("+7");
     const [fullName, setFullName] = useState("");
     const [password, setPassword] = useState("");
-    const [smsCode, setSmsCode] = useState("");
-    const [debugCode, setDebugCode] = useState("");
     const [telegramAuth, setTelegramAuth] = useState(null);
     const [priceMin, setPriceMin] = useState("");
     const [priceMax, setPriceMax] = useState("");
@@ -417,6 +415,36 @@ export function useRentServiceApp() {
             });
         }
     }, [profile]);
+
+    useEffect(() => {
+        if (!profile?.id) return;
+
+        let disposed = false;
+
+        const openChatFromUrl = async (url) => {
+            if (!url || disposed) return;
+            const normalized = url.replace("rentservice://chat?", "rentservice://chat/?");
+            const paramsPart = normalized.split("?")[1] || "";
+            const params = new URLSearchParams(paramsPart);
+            const adId = params.get("adId") || params.get("chatAdId");
+            const sellerId = params.get("sellerId");
+            if (!adId || !sellerId) return;
+
+            await openDialogFromAd({
+                id: Number(adId),
+                ownerId: Number(sellerId),
+                title: params.get("adTitle") || "Объявление"
+            });
+        };
+
+        Linking.getInitialURL().then(openChatFromUrl);
+        const subscription = Linking.addEventListener("url", ({ url }) => openChatFromUrl(url));
+
+        return () => {
+            disposed = true;
+            subscription?.remove?.();
+        };
+    }, [profile?.id]);
 
     async function bootstrap() {
         if (!await storage.getToken()) {
@@ -1115,7 +1143,7 @@ export function useRentServiceApp() {
 
             // НАТИВНАЯ АДАПТАЦИЯ ОТКРЫТИЯ ССЫЛКИ ДОГОВОРА В БРАУЗЕРЕ УСТРОЙСТВА
             if (response?.documentUrl) {
-                Linking.openURL(response.documentUrl).catch((err) =>
+                Linking.openURL(assetUrl(response.documentUrl)).catch((err) =>
                     console.error("Не удалось открыть ссылку на документ:", err)
                 );
             }
@@ -1226,9 +1254,7 @@ export function useRentServiceApp() {
             setBusy("save-payout-details", true);
             const payload = payloadOverride || {
                 payoutBankName: profile?.payoutBankName || "",
-                payoutAccountNumber: profile?.payoutAccountNumber || "",
-                payoutCardCvc: profile?.payoutCardCvc || "",
-                payoutCardExpiry: profile?.payoutCardExpiry || ""
+                payoutAccountNumber: profile?.payoutAccountNumber || ""
             };
             const updated = await authApi.updateMyPaymentDetails(payload);
             setProfile(updated);
@@ -1542,8 +1568,6 @@ export function useRentServiceApp() {
             await adminApi.updateUserVerification(
                 user.id,
                 !isRemoving,
-                false,
-                false,
                 isRemoving ? verificationType : "owner_verified",
                 isRemoving ? revokeOwnerVerification : false
             );
@@ -1662,10 +1686,6 @@ export function useRentServiceApp() {
         setFullName,
         password,
         setPassword,
-        smsCode,
-        setSmsCode,
-        debugCode,
-        setDebugCode,
         telegramAuth,
         setTelegramAuth,
         priceMin,

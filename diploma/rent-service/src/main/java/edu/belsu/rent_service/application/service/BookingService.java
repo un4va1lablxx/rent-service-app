@@ -67,7 +67,6 @@ public class BookingService {
                 .startDate(request.startDate())
                 .endDate(request.endDate())
                 .agreedPrice(request.agreedPrice())
-                .contactRevealed(false)
                 .build();
 
         return map(bookingRepository.save(booking));
@@ -113,7 +112,6 @@ public class BookingService {
                     throw new ApiException("Only the landlord can confirm a booking");
                 }
                 booking.setStatus("confirmed");
-                booking.setContactRevealed(true);
             }
             case "cancelled" -> booking.setStatus("cancelled");
             case "completed" -> {
@@ -121,7 +119,6 @@ public class BookingService {
                     throw new ApiException("Only confirmed bookings can be completed");
                 }
                 booking.setStatus("completed");
-                booking.setContactRevealed(true);
                 LocalDateTime completedAt = LocalDateTime.now();
                 booking.setCompletedAt(completedAt);
                 markAdAsUnavailable(booking.getAd(), completedAt);
@@ -145,7 +142,6 @@ public class BookingService {
                 .startDate(booking.getStartDate())
                 .endDate(booking.getEndDate())
                 .agreedPrice(booking.getAgreedPrice())
-                .contactRevealed(booking.isContactRevealed())
                 .completedAt(booking.getCompletedAt())
                 .createdAt(booking.getCreatedAt())
                 .updatedAt(booking.getUpdatedAt())

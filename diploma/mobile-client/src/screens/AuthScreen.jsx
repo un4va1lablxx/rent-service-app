@@ -26,8 +26,6 @@ export function AuthScreen(props) {
         setFullName,
         password,
         setPassword,
-        smsCode,
-        setSmsCode,
         telegramAuth,
         setTelegramAuth,
         error,

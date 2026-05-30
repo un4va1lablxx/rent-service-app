@@ -9,12 +9,17 @@ public class AdData {
     private String rentalType;
     private String title;
     private String city;
+    private String district;
+    private String region;
     private String address;
+    private String propertyType = "apartment";
     private Integer pricePerMonth;
     private Integer pricePerDay;
     private Integer rooms;
     private Integer maxGuests;
     private Double area;
+    private Integer floor;
+    private Integer totalFloors;
     private String description;
     private List<String> photoUrls = new ArrayList<>();
 
@@ -28,8 +33,17 @@ public class AdData {
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
 
+    public String getDistrict() { return district; }
+    public void setDistrict(String district) { this.district = district; }
+
+    public String getRegion() { return region; }
+    public void setRegion(String region) { this.region = region; }
+
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
+
+    public String getPropertyType() { return propertyType; }
+    public void setPropertyType(String propertyType) { this.propertyType = propertyType; }
 
     public Integer getPricePerMonth() { return pricePerMonth; }
     public void setPricePerMonth(Integer pricePerMonth) { this.pricePerMonth = pricePerMonth; }
@@ -46,6 +60,12 @@ public class AdData {
     public Double getArea() { return area; }
     public void setArea(Double area) { this.area = area; }
 
+    public Integer getFloor() { return floor; }
+    public void setFloor(Integer floor) { this.floor = floor; }
+
+    public Integer getTotalFloors() { return totalFloors; }
+    public void setTotalFloors(Integer totalFloors) { this.totalFloors = totalFloors; }
+
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
@@ -54,10 +74,10 @@ public class AdData {
 
     public AdRequest buildRequest() {
         return new AdRequest(
-                title, description, address, city, null, "",
-                "apartment", rentalType, null, null,
+                title, description, address, city, district, region,
+                propertyType, rentalType, null, null,
                 rooms, pricePerMonth, pricePerDay, maxGuests,
-                area != null ? BigDecimal.valueOf(area) : null, null, null, photoUrls
+                area != null ? BigDecimal.valueOf(area) : null, floor, totalFloors, photoUrls
         );
     }
 }

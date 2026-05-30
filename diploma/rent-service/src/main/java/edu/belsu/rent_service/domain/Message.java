@@ -44,19 +44,12 @@ public class Message {
     @Column(name = "related_id")
     private Long relatedId;
 
-    @Column(name = "contains_contact_details")
-    @Builder.Default
-    private boolean containsContactDetails = false;
-
     @Column(name = "is_read")
     @Builder.Default
     private boolean read = false;
 
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
-
-    @Column(name = "read_at")
-    private LocalDateTime readAt;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

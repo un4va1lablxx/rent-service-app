@@ -10,9 +10,5 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByPhoneNumber(String phoneNumber);
-    Optional<User> findByTelegramId(Long telegramId);
-    Optional<User> findByMaxId(Long maxId);
-    List<User> findByRole(String role);
-    List<User> findByBlockedFalseAndVerifiedTrue();
     boolean existsByPhoneNumber(String phoneNumber);
 }

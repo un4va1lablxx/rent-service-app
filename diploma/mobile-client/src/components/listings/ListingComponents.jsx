@@ -9,7 +9,8 @@ import {
   View
 } from "react-native";
 // Сохраняем импорт ваших UI-компонентов и форматировщиков
-import { fallbackImage, formatArea, formatPriceWithType, propertyLabel } from "../../shared/formatters";
+import { compactName, fallbackImage, formatArea, formatPriceWithType, propertyLabel } from "../../shared/formatters";
+import { assetUrl } from "../../lib/api";
 import { Fact, Icon, Modal } from "../ui";
 
 const OWNER_VERIFIED_BADGE_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAAAsTAAALEwEAmpwYAAADvklEQVR4nO2aSWsUURCAa9w9RxQRd68aJRdRXC9xAU9Go4lrJKLBmVc9QvA0B/0D6t2j4EFFIXrIRXLw5NGD2Uy6qhNJIJqECIJLS70eMnbP9Di9zHQLFtRppt+r71W96lf1GuC/eCT/aS3cGloJtUphbJV+JlVSsJcA8gAgMSjOVQXqfrccFHeDYgsUvwGwM5AaUdQDyHZJydTGFuxlLljDagPFI+7/8nVIhRjWRkCe8xjnqKJBUNQByJ2geLjyf3gWkDYkjQGg+EVFA4Ooor6EIagjMkQpHNvraKmdgR6rCZS5DZCbQU3shxy1OrFO1wBpOjYQRVN6X8nYOT4OOToIebNFz62zW5SkkB1dF9+KR9Qeqyk8CNKOxAGwqLmxLeFBDGtP4gC4uId2hgeROE0cgB01rH3hQRSfTE9oUWt4EMM8mzgAFlXx6QgekRSbAggUpa6Q3tDviqkUeeSzfs/U7oXx9YD0NHHD0dczryA7sakKgZ0B5IugeCZ5Y/lvMF8BuVefqF0iRwCpDRpv0C9Q/DrCGAPu4kyqNSmKGg2BnHXCme+FGkMRlRdxSDcbBqHoJ+Toqmf+l8HHqbT5nRL0YwM88QOUdckD0Q6KvgdcjHEovF+RzHtDjJUaxg3RpT0UdCzDvOyfuByvDIdwcS3PfAPDPFUeznqvBF2QQVc/oKJICg4WKk/0AiA/CAShGxYhIFDPeb46RNDyVVJnm73UedDOgOKHFVZvARQf9SzWnYhh2lkdQoxC+hDAxQuQ48OlAQSG7rt+Rz7igeiNCGHrUK4aWkhXQsSrH8wXQN7r9jbfjQyBRfWm71jSr6J53Zj4EyY/udnXU3Go8ku/0vGLNvACIB0qH9hn78ShhnnDPZeQIY/FsEpuGNlzih/VBQK1TgLS6hKIHLx0EzoWl8/r+lo2I/LjOkLY+qBb3tG3M9pVfn3coDBI/XUEmHWa39WadlJQXX5W15WMtkh9unEeqNSNsyUa3QszwUpd74EuPZ64Fg5i0StpAbHOhAdBOpY4AC7qifAg8rZOjUfMA+FBsrwrcQAsas7aHR4kP741cQAs6m1ze3gQY2JN4gBY1Gh38nKKlZ6XXH+ZLfqaQa7FnGvm7nhbqjStU6y+eqPW4v5s1nPr26p63sdL9yO2PUDn6mdoTTD8/N+/nhaRy37nEFfBQB4BxRecPgAN+YDMBTs71VO8RZm0Mr3fpJQ+4RiuXhwlKtLJp/7i5u/VvWQ/cVpH0nIaBaS35R31pEWyWzUAr4i3UveZEyQvvwFe/tNTzJCI2wAAAABJRU5ErkJggg==";
@@ -53,10 +54,11 @@ export function VerificationBadge({ status }) {
 }
 
 function OwnerAvatar({ name, avatarUrl }) {
+  const resolvedAvatarUrl = assetUrl(avatarUrl);
   return (
-      <View style={[styles.avatarContainer, avatarUrl ? styles.avatarHasPhoto : null]}>
-        {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+      <View style={[styles.avatarContainer, resolvedAvatarUrl ? styles.avatarHasPhoto : null]}>
+        {resolvedAvatarUrl ? (
+            <Image source={{ uri: resolvedAvatarUrl }} style={styles.avatarImage} />
         ) : (
             <Text style={styles.avatarText}>{getInitials(name)}</Text>
         )}
@@ -66,7 +68,9 @@ function OwnerAvatar({ name, avatarUrl }) {
 
 export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading, showFavoriteButton = true, footer = null, statusBadge = null, mutedMessage = "", disabledOpen = false, className = "" }) {
   const [index, setIndex] = useState(0);
-  const photos = ad.photoUrls?.length ? ad.photoUrls : ad.photos?.length ? ad.photos : [fallbackImage(ad.propertyType)];
+  const photos = (ad.photoUrls?.length ? ad.photoUrls : ad.photos?.length ? ad.photos : [fallbackImage(ad.propertyType)]).map(assetUrl);
+  const currentPhoto = photos[index];
+  const isFallbackPhoto = currentPhoto?.startsWith("data:image/svg");
 
   return (
       <View style={[styles.card, mutedMessage ? styles.cardMuted : null]}>
@@ -78,7 +82,14 @@ export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading,
               onPress={() => !disabledOpen && onOpen?.(ad.id)}
               disabled={disabledOpen}
           >
-            <Image style={styles.coverImage} source={{ uri: photos[index] }} />
+            {isFallbackPhoto ? (
+                <View style={styles.coverFallback}>
+                  <Text style={styles.coverFallbackIcon}>⌂</Text>
+                  <Text style={styles.coverFallbackText}>{propertyLabel(ad.propertyType)}</Text>
+                </View>
+            ) : (
+                <Image style={styles.coverImage} source={{ uri: currentPhoto }} />
+            )}
           </TouchableOpacity>
 
           {photos.length > 1 && (
@@ -121,11 +132,11 @@ export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading,
             </TouchableOpacity>
 
             <View style={styles.headerActions}>
-              {statusBadge?.label && (
+              {React.isValidElement(statusBadge) ? statusBadge : statusBadge?.label ? (
                   <View style={[styles.statusBadge, statusBadge.style]}>
                     <Text style={styles.statusBadgeText}>{statusBadge.label}</Text>
                   </View>
-              )}
+              ) : null}
               {showFavoriteButton && (
                   <TouchableOpacity
                       style={styles.favoriteButton}
@@ -158,7 +169,9 @@ export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading,
 
 export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loading, onOpenDialog, onOpenOwnerProfile, hideActions = false, duplicateWarning = null, footer = null }) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
-  const photos = ad?.photoUrls?.length ? ad.photoUrls : [fallbackImage(ad?.propertyType || "apartment")];
+  const photos = (ad?.photoUrls?.length ? ad.photoUrls : [fallbackImage(ad?.propertyType || "apartment")]).map(assetUrl);
+  const currentPhoto = photos[currentPhotoIndex];
+  const isFallbackPhoto = currentPhoto?.startsWith("data:image/svg");
 
   return (
       <Modal onClose={onClose} wide>
@@ -173,7 +186,14 @@ export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loadin
             <View style={styles.photoCounterBox}>
               <Text style={styles.photoCounterText}>{currentPhotoIndex + 1} / {photos.length}</Text>
             </View>
-            <Image source={{ uri: photos[currentPhotoIndex] }} style={styles.detailsMainImage} />
+            {isFallbackPhoto ? (
+                <View style={styles.detailsFallback}>
+                  <Text style={styles.coverFallbackIcon}>⌂</Text>
+                  <Text style={styles.coverFallbackText}>{propertyLabel(ad?.propertyType)}</Text>
+                </View>
+            ) : (
+                <Image source={{ uri: currentPhoto }} style={styles.detailsMainImage} />
+            )}
 
             {photos.length > 1 && (
                 <>
@@ -209,7 +229,7 @@ export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loadin
                   <OwnerAvatar name={ad?.ownerName || ad?.userFullName || "Владелец"} avatarUrl={ad?.ownerAvatarUrl} />
                   <View style={styles.ownerMetaColumn}>
                     <View style={styles.ownerNameRow}>
-                      <Text style={styles.ownerNameText}>{ad?.ownerName || ad?.userFullName || "Владелец"}</Text>
+                      <Text style={styles.ownerNameText}>{compactName(ad?.ownerName || ad?.userFullName) || "Владелец"}</Text>
                       <VerificationBadge status={ad?.ownerVerificationStatus} />
                     </View>
                     <View style={styles.ratingRow}>
@@ -322,6 +342,15 @@ const styles = StyleSheet.create({
   mediaContainer: { height: 200, width: '100%', position: 'relative' },
   coverButton: { width: '100%', height: '100%' },
   coverImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  coverFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F4F5F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverFallbackIcon: { fontSize: 42, color: '#C7CBD3', fontWeight: '700', marginBottom: 6 },
+  coverFallbackText: { color: '#8E8E93', fontSize: 13, fontWeight: '700', textTransform: 'uppercase' },
   sliderArrow: {
     position: 'absolute',
     top: '40%',
@@ -372,6 +401,7 @@ const styles = StyleSheet.create({
   photoCounterBox: { position: 'absolute', top: 12, left: 12, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, zIndex: 12 },
   photoCounterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
   detailsMainImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  detailsFallback: { width: '100%', height: '100%', backgroundColor: '#F4F5F8', alignItems: 'center', justifyContent: 'center' },
 
   ownerCard: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#eee', marginBottom: 16 },
   ownerIdentityRow: { flexDirection: 'row', alignItems: 'center' },

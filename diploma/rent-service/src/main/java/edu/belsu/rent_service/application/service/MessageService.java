@@ -46,12 +46,20 @@ import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSectPr;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -129,9 +137,7 @@ public class MessageService {
         validateMessageRequest(request);
 
         String text = request.text().trim();
-        Message message = buildMessage(ad, currentUser, recipient, text, "text", null);
-        message.setContainsContactDetails(containsContactDetails(text));
-        Message savedMessage = messageRepository.save(message);
+        Message savedMessage = messageRepository.save(buildMessage(ad, currentUser, recipient, text, "text", null));
         notifyDialogParticipants(ad, currentUser, recipient);
         return mapToResponse(savedMessage);
     }
@@ -317,7 +323,6 @@ public class MessageService {
                         .startDate(todayMoscow())
                         .endDate(todayMoscow().plusMonths(1))
                         .agreedPrice(resolveAdPrice(viewingRequest.getAd()))
-                        .contactRevealed(true)
                         .build());
                 viewingRequest.setBooking(booking);
             }
@@ -397,7 +402,6 @@ public class MessageService {
         User currentUser = authenticatedUserService.getCurrentUser(authentication);
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new ApiException("Contract not found"));
-
         if (!contract.getBooking().getTenant().getId().equals(currentUser.getId())) {
             throw new ApiException("Only the tenant can sign this contract");
         }
@@ -410,7 +414,6 @@ public class MessageService {
         if (request == null || !request.signConfirmed()) {
             throw new ApiException("Подтвердите подписание договора");
         }
-
         Map<String, Object> contractData = readContractData(contract);
         applyTenantContractData(contractData, contract.getBooking(), request);
         LocalDateTime signedAt = nowMoscow();
@@ -418,11 +421,9 @@ public class MessageService {
         contractData.put("tenantSignedAt", SIGNATURE_DATE_TIME_FORMATTER.format(signedAt));
         contractData.put("tenantSignatureHash", signatureHash);
         contractData.put("tenantSignatureLabel", buildSignatureLabel(contract.getBooking().getTenant(), signedAt, signatureHash));
-
         byte[] docx = generateContractDocx(contract.getBooking(), contractData);
         String fileName = "contract_" + contract.getBooking().getId() + "_" + UUID.randomUUID() + ".docx";
         String documentUrl = fileUploadService.saveFile(docx, fileName);
-
         contract.setPdfUrl(documentUrl);
         contract.setContractData(toJson(contractData));
         contract.setTenantSignedAt(signedAt);
@@ -434,7 +435,6 @@ public class MessageService {
         bookingRepository.save(booking);
         Contract savedContract = contractRepository.save(contract);
         Payment payment = createOrRefreshPayment(savedContract, contractData);
-
         findOrCreateContractActiveMessage(savedContract, buildMessage(
                 contract.getBooking().getAd(),
                 contract.getBooking().getTenant(),
@@ -750,7 +750,6 @@ public class MessageService {
                 .encryptedText(encode(rawText))
                 .messageType(type)
                 .relatedId(relatedId)
-                .containsContactDetails(false)
                 .deliveredAt(nowMoscow())
                 .build();
     }
@@ -766,10 +765,8 @@ public class MessageService {
                 .text(decode(message.getEncryptedText()))
                 .relatedId(message.getRelatedId())
                 .messageType(message.getMessageType())
-                .containsContactDetails(message.isContainsContactDetails())
                 .read(message.isRead())
                 .deliveredAt(message.getDeliveredAt())
-                .readAt(message.getReadAt())
                 .createdAt(message.getCreatedAt())
                 .build();
     }
@@ -817,7 +814,7 @@ public class MessageService {
                   </w:body>
                 </w:document>
                 """.formatted(String.join("",
-                paragraph("Р”РћР“РћР’РћР  РђР ЕНДЫ"),
+                paragraph("ДОГОВОР АРЕНДЫ"),
                 paragraph("Объект: " + escapeXml(booking.getAd().getTitle())),
                 paragraph("Адрес: " + escapeXml(booking.getAd().getAddress())),
                 paragraph("Арендодатель: " + escapeXml(booking.getLandlord().getFullName())),
@@ -1004,7 +1001,7 @@ public class MessageService {
         addParagraph(document, "2.1. Размер платы за наем составляет " + asText(data.get("priceText")) + ".", ParagraphAlignment.BOTH, false, 12, false);
         addParagraph(document, "2.2. Обеспечительный платеж: " + asText(data.get("depositText")) + ".", ParagraphAlignment.BOTH, false, 12, false);
         addParagraph(document, "2.3. Коммунальные услуги: "
-                + (Boolean.parseBoolean(asText(data.get("utilitiesIncluded"))) ? "включены в стоимость найма." : "оплачиваются отдельно по показаниям счетчиков и квитанциям."),
+                        + (Boolean.parseBoolean(asText(data.get("utilitiesIncluded"))) ? "включены в стоимость найма." : "оплачиваются отдельно по показаниям счетчиков и квитанциям."),
                 ParagraphAlignment.BOTH, false, 12, false);
 
         addSectionHeading(document, "3. Права и обязанности сторон");
@@ -1075,7 +1072,7 @@ public class MessageService {
 
     private List<String> buildShortTermContractParagraphs(Booking booking, Map<String, Object> data) {
         return List.of(
-                titleParagraph("Р”РћР“РћР’РћР  ПОСУТОЧНОЙ РђР ЕНДЫ РљР’РђР РўРР Ы"),
+                titleParagraph("ДОГОВОР ПОСУТОЧНОЙ АРЕНДЫ ЖИЛОГО ПОМЕЩЕНИЯ"),
                 centeredMetaParagraph("г. " + asText(data.get("city")) + "    " + asText(data.get("signingDateText"))),
                 paragraph("Арендодатель " + asText(data.get("landlordFullName")) + ", " + buildPassportSummary("landlord", data) + ", с одной стороны, и Арендатор " + asText(data.get("tenantFullName")) + ", " + buildPassportSummary("tenant", data) + ", с другой стороны, заключили настоящий договор о нижеследующем."),
                 sectionParagraph("1. Предмет договора"),
@@ -1097,7 +1094,7 @@ public class MessageService {
                 paragraph("5.1. Стороны подтверждают заключение договора электронным способом в информационной системе Rent."),
                 paragraph("5.2. Подпись Арендодателя: " + asText(data.get("landlordSignatureLabel")) + "."),
                 paragraph("5.3. Подпись Арендатора: " + asText(data.get("tenantSignatureLabel")) + "."),
-                sectionParagraph("6. Р еквизиты и подписи сторон"),
+                sectionParagraph("6. Реквизиты и подписи сторон"),
                 paragraph("Арендодатель: " + asText(data.get("landlordFullName")) + ". Адрес регистрации: " + asText(data.get("landlordRegistrationAddress")) + "."),
                 paragraph("Арендатор: " + asText(data.get("tenantFullName")) + ". Адрес регистрации: " + asText(data.get("tenantRegistrationAddress")) + ".")
         );
@@ -1126,7 +1123,7 @@ public class MessageService {
                 paragraph("4.1. Настоящий договор подписывается сторонами посредством электронного подтверждения в системе Rent."),
                 paragraph("4.2. Подпись Арендодателя: " + asText(data.get("landlordSignatureLabel")) + "."),
                 paragraph("4.3. Подпись Арендатора: " + asText(data.get("tenantSignatureLabel")) + "."),
-                sectionParagraph("5. Р еквизиты сторон"),
+                sectionParagraph("5. Реквизиты сторон"),
                 paragraph("Арендодатель: " + asText(data.get("landlordFullName")) + ", адрес регистрации: " + asText(data.get("landlordRegistrationAddress")) + "."),
                 paragraph("Арендатор: " + asText(data.get("tenantFullName")) + ", адрес регистрации: " + asText(data.get("tenantRegistrationAddress")) + ".")
         );
@@ -1452,55 +1449,67 @@ public class MessageService {
                                Map<String, Object> contractData,
                                String maskedCard,
                                LocalDateTime paidAt) {
-        String receipt = """
-                <!doctype html>
-                <html lang="ru">
-                <head>
-                  <meta charset="utf-8">
-                  <title>Чек оплаты аренды</title>
-                  <style>
-                    body { font-family: Arial, sans-serif; background: #f4f6f8; color: #111; padding: 32px; }
-                    .receipt { max-width: 520px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 28px; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12); }
-                    .line { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
-                    .line.total { font-weight: 700; font-size: 18px; border-bottom: none; padding-top: 16px; }
-                    .muted { color: #6b7280; font-size: 13px; }
-                    h1 { margin: 0 0 8px; font-size: 28px; }
-                    h2 { margin: 0 0 24px; font-size: 15px; font-weight: 500; color: #4b5563; }
-                  </style>
-                </head>
-                <body>
-                  <div class="receipt">
-                    <h1>Чек оплаты</h1>
-                    <h2>Электронное подтверждение платежа по договору аренды</h2>
-                    <div class="line"><span>Арендодатель</span><strong>%s</strong></div>
-                    <div class="line"><span>Объект</span><strong>%s</strong></div>
-                    <div class="line"><span>Аренда</span><strong>%s</strong></div>
-                    <div class="line"><span>Залог</span><strong>%s</strong></div>
-                    <div class="line total"><span>Итого к оплате</span><strong>%s</strong></div>
-                    <div class="line"><span>Оплачено картой</span><strong>%s</strong></div>
-                    <div class="line"><span>Счет зачисления</span><strong>%s · %s</strong></div>
-                    <div class="line"><span>Дата оплаты</span><strong>%s</strong></div>
-                    <p class="muted">Платеж связан с договором №%s и бронированием №%s.</p>
-                  </div>
-                </body>
-                </html>
-                """.formatted(
-                escapeXml(defaultText(payment.getBooking().getLandlord().getFullName(), "Арендодатель")),
-                escapeXml(defaultText(payment.getBooking().getAd().getAddress(), "Объект аренды")),
-                escapeXml(buildPriceText(payment.getBooking().getAd())),
-                escapeXml(defaultText(contractData.get("depositText"), "0 руб.")),
-                escapeXml(formatContractMoney(payment.getAmount())),
-                escapeXml(maskedCard),
-                escapeXml(defaultText(payment.getBooking().getLandlord().getPayoutBankName(), "Банк")),
-                escapeXml(maskPayoutAccount(payment.getBooking().getLandlord().getPayoutAccountNumber())),
-                escapeXml(SIGNATURE_DATE_TIME_FORMATTER.format(paidAt)),
-                escapeXml(String.valueOf(contract.getId())),
-                escapeXml(String.valueOf(payment.getBooking().getId()))
-        );
-        return fileUploadService.saveFile(receipt.getBytes(StandardCharsets.UTF_8),
-                "receipt_" + payment.getId() + "_" + UUID.randomUUID() + ".html");
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            PDFont font = loadReceiptFont(document);
+
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                float y = 770;
+                writePdfLine(content, font, 24, 56, y, "Чек оплаты");
+                y -= 28;
+                writePdfLine(content, font, 11, 56, y, "Электронное подтверждение платежа по договору аренды");
+                y -= 36;
+                writePdfLine(content, font, 13, 56, y, "Арендодатель: " + defaultText(payment.getBooking().getLandlord().getFullName(), "Арендодатель"));
+                y -= 24;
+                writePdfLine(content, font, 13, 56, y, "Объект: " + defaultText(payment.getBooking().getAd().getAddress(), "Объект аренды"));
+                y -= 24;
+                writePdfLine(content, font, 13, 56, y, "Аренда: " + buildPriceText(payment.getBooking().getAd()));
+                y -= 24;
+                writePdfLine(content, font, 13, 56, y, "Залог: " + defaultText(contractData.get("depositText"), "0 руб."));
+                y -= 30;
+                writePdfLine(content, font, 17, 56, y, "Итого к оплате: " + formatContractMoney(payment.getAmount()));
+                y -= 30;
+                writePdfLine(content, font, 13, 56, y, "Оплачено картой: " + maskedCard);
+                y -= 24;
+                writePdfLine(content, font, 13, 56, y, "Счет зачисления: "
+                        + defaultText(payment.getBooking().getLandlord().getPayoutBankName(), "Банк")
+                        + " · " + maskPayoutAccount(payment.getBooking().getLandlord().getPayoutAccountNumber()));
+                y -= 24;
+                writePdfLine(content, font, 13, 56, y, "Дата оплаты: " + SIGNATURE_DATE_TIME_FORMATTER.format(paidAt));
+                y -= 36;
+                writePdfLine(content, font, 11, 56, y, "Платеж связан с договором №" + contract.getId()
+                        + " и бронированием №" + payment.getBooking().getId() + ".");
+            }
+
+            document.save(out);
+            return fileUploadService.saveFile(out.toByteArray(),
+                    "receipt_" + payment.getId() + "_" + UUID.randomUUID() + ".pdf");
+        } catch (IOException error) {
+            throw new ApiException("Failed to generate payment receipt");
+        }
     }
 
+    private PDFont loadReceiptFont(PDDocument document) throws IOException {
+        for (String path : List.of(
+                "C:/Windows/Fonts/arial.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/System/Library/Fonts/Supplemental/Arial.ttf")) {
+            File file = new File(path);
+            if (file.exists()) {
+                return PDType0Font.load(document, file);
+            }
+        }
+        return PDType1Font.HELVETICA;
+    }
+
+    private void writePdfLine(PDPageContentStream content, PDFont font, int size, float x, float y, String text) throws IOException {
+        content.beginText();
+        content.setFont(font, size);
+        content.newLineAtOffset(x, y);
+        content.showText(defaultText(text, "").replace("\n", " "));
+        content.endText();
+    }
     private String maskCardNumber(String cardNumber) {
         String digits = requireText(cardNumber, "Укажите номер карты").replaceAll("\\s+", "");
         return "**** **** **** " + digits.substring(digits.length() - 4);
@@ -1638,8 +1647,4 @@ public class MessageService {
         }
     }
 
-    private boolean containsContactDetails(String text) {
-        String normalized = text.replaceAll("\\s+", "");
-        return normalized.matches(".*(\\+?\\d{10,}|@\\w+|t\\.me/\\w+).*");
-    }
 }

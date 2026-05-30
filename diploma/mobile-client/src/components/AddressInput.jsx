@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 const DADATA_API_KEY = "25fcfb5efefa78337862051ad97f5be41c0cc263";
 
@@ -94,19 +94,18 @@ export default function AddressInput({
 
             {shouldShowSuggestions ? (
                 <View style={styles.dropdown}>
-                    <FlatList
-                        data={suggestions}
-                        keyExtractor={(item, index) => `${item?.value || "address"}-${index}`}
-                        keyboardShouldPersistTaps="handled"
-                        renderItem={({ item }) => (
-                            <Pressable style={styles.suggestionItem} onPress={() => handleSelectSuggestion(item)}>
+                    {suggestions.map((item, index) => (
+                            <Pressable
+                                key={`${item?.value || "address"}-${index}`}
+                                style={styles.suggestionItem}
+                                onPress={() => handleSelectSuggestion(item)}
+                            >
                                 <Text style={styles.suggestionValue}>{item?.value || ""}</Text>
                                 {item?.data?.city ? (
                                     <Text style={styles.suggestionDetail}>г. {item.data.city}</Text>
                                 ) : null}
                             </Pressable>
-                        )}
-                    />
+                    ))}
                 </View>
             ) : null}
         </View>

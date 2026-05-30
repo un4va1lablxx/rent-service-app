@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -7,6 +7,16 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+
+function parseDate(value) {
+    const [year, month, day] = String(value || "").split("-").map(Number);
+    return year && month && day ? new Date(year, month - 1, day) : new Date();
+}
+
+function formatDate(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 export function DiscoverScreen(props) {
     const {
@@ -26,6 +36,8 @@ export function DiscoverScreen(props) {
         handleSearchSubmit, handleToggleFavorite,
         setSelectedAdId
     } = props;
+
+    const [datePicker, setDatePicker] = useState({ open: false, field: "checkIn" });
 
     // Безопасный вызов веб-обработчика формы на мобильной платформе
     const triggerSearch = () => {
@@ -147,23 +159,32 @@ export function DiscoverScreen(props) {
                     <View style={styles.field}>
                         <Text style={styles.fieldLabel}>Даты проживания</Text>
                         <View style={styles.dateRangeContainer}>
-                            {/* При интеграции реальных дат рекомендуется использовать библиотеку @react-native-community/datetimepicker */}
-                            <TextInput
-                                style={[styles.input, { flex: 1, textAlign: 'center' }]}
-                                placeholder="Заезд (ГГГГ-ММ-ДД)"
-                                placeholderTextColor="#A2A2A7"
-                                value={checkInDate}
-                                onChangeText={setCheckInDate}
-                            />
+                            <TouchableOpacity style={styles.dateButton} onPress={() => setDatePicker({ open: true, field: "checkIn" })}>
+                                <Text style={[styles.dateButtonText, !checkInDate && styles.dateButtonPlaceholder]}>
+                                    {checkInDate || "Заезд"}
+                                </Text>
+                            </TouchableOpacity>
                             <Text style={styles.dateSeparator}>➔</Text>
-                            <TextInput
-                                style={[styles.input, { flex: 1, textAlign: 'center' }]}
-                                placeholder="Выезд (ГГГГ-ММ-ДД)"
-                                placeholderTextColor="#A2A2A7"
-                                value={checkOutDate}
-                                onChangeText={setCheckOutDate}
-                            />
+                            <TouchableOpacity style={styles.dateButton} onPress={() => setDatePicker({ open: true, field: "checkOut" })}>
+                                <Text style={[styles.dateButtonText, !checkOutDate && styles.dateButtonPlaceholder]}>
+                                    {checkOutDate || "Выезд"}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
+                        {datePicker.open && (
+                            <DateTimePicker
+                                value={parseDate(datePicker.field === "checkIn" ? checkInDate : checkOutDate)}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    setDatePicker((prev) => ({ ...prev, open: false }));
+                                    if (event.type === "dismissed" || !selectedDate) return;
+                                    const value = formatDate(selectedDate);
+                                    if (datePicker.field === "checkIn") setCheckInDate(value);
+                                    else setCheckOutDate(value);
+                                }}
+                            />
+                        )}
                     </View>
                 )}
 
@@ -363,6 +384,24 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         width: "100%",
+    },
+    dateButton: {
+        flex: 1,
+        height: 44,
+        borderRadius: 10,
+        backgroundColor: "#F2F2F7",
+        justifyContent: "center",
+        paddingHorizontal: 12,
+    },
+    dateButtonText: {
+        color: "#1C1C1E",
+        fontSize: 14,
+        fontWeight: "600",
+        textAlign: "center",
+    },
+    dateButtonPlaceholder: {
+        color: "#A2A2A7",
+        fontWeight: "500",
     },
     dateSeparator: {
         marginHorizontal: 8,

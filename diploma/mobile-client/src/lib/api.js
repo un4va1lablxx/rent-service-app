@@ -2,11 +2,38 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
 // Для тестирования на реальном мобильном устройстве вместо localhost используйте адрес из App.js: WEB_APP_URL = "http://192.168.0.23:8080".
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ||
-  Constants.expoConfig?.extra?.apiBaseUrl?.trim() ||
-  "http://192.168.0.23:8080";
+export const API_BASE_URL = "http://192.168.0.23:8080";
 
+export function assetUrl(url) {
+    if (!url) return "";
+    const value = String(url);
+    const base = new URL(API_BASE_URL);
+
+    // Если это уже полный URL (с http), возвращаем как есть
+    if (/^https?:\/\//i.test(value)) {
+        try {
+            const parsed = new URL(value);
+            if (["localhost", "127.0.0.1", "10.0.2.2"].includes(parsed.hostname)) {
+                parsed.protocol = base.protocol;
+                parsed.host = base.host;
+                return parsed.toString();
+            }
+        } catch {
+            return value;
+        }
+        return value;
+    }
+
+    if (/^(data:|file:|content:)/i.test(value)) return value;
+
+    // Если путь начинается с /, приклеиваем наш базовый IP
+    if (value.startsWith('/')) return `${API_BASE_URL}${value}`;
+
+    // Если путь относительный без слэша, добавляем слэш и базовый IP
+    return `${API_BASE_URL}/${value}`;
+}
+
+export const getFullUrl = assetUrl;
 function resolveWebSocketUrl(path) {
   const baseUrl = new URL(API_BASE_URL);
   const protocol = baseUrl.protocol === "https:" ? "wss:" : "ws:";
@@ -74,11 +101,6 @@ export const storage = {
 };
 
 export const authApi = {
-  requestSmsCode: (phoneNumber, purpose) =>
-    request("/api/auth/sms-code", {
-      method: "POST",
-      body: JSON.stringify({ phoneNumber, purpose })
-    }),
   register: (payload) =>
     request("/api/auth/register", {
       method: "POST",
@@ -327,7 +349,11 @@ export const uploadApi = {
   },
   uploadFile: (file) => {
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", {
+      uri: file.uri,
+      name: file.fileName || file.name || `file-${Date.now()}.jpg`,
+      type: file.mimeType || file.type || "image/jpeg"
+    });
     return request("/api/upload/file", {
       method: "POST",
       body: formData,
@@ -365,8 +391,6 @@ export const adminApi = {
     updateUserVerification: (
         userId,
         verified,
-        smsVerified = false,
-        gosuslugiVerified = false,
         verificationType = null,
         revokeOwnerVerification = false
     ) =>
@@ -374,8 +398,6 @@ export const adminApi = {
             method: "PATCH",
             body: JSON.stringify({
                 verified,
-                smsVerified,
-                gosuslugiVerified,
                 verificationType,
                 revokeOwnerVerification
             })

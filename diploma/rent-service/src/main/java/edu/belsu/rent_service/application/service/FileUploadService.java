@@ -26,15 +26,11 @@ public class FileUploadService {
         List<String> urls = new ArrayList<>();
 
         try {
-            // Получаем абсолютный путь к директории проекта
             String basePath = System.getProperty("user.dir");
             Path uploadPath = Paths.get(basePath, uploadDir);
-
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
-                System.out.println("📁 Создана папка для загрузки: " + uploadPath.toAbsolutePath());
             }
-
             for (MultipartFile file : files) {
                 String originalFilename = file.getOriginalFilename();
                 String extension = "";
@@ -44,13 +40,10 @@ public class FileUploadService {
                 String filename = UUID.randomUUID().toString() + extension;
                 Path filePath = uploadPath.resolve(filename);
                 file.transferTo(filePath.toFile());
-
-                String url = "http://localhost:8080/uploads/" + filename;
+                String url = "http://192.168.0.23:8080/uploads/" + filename;
                 urls.add(url);
-                System.out.println("✅ Файл сохранён: " + filePath.toAbsolutePath());
             }
         } catch (IOException e) {
-            e.printStackTrace();
             throw new RuntimeException("Ошибка при сохранении файлов: " + e.getMessage(), e);
         }
 
@@ -68,7 +61,7 @@ public class FileUploadService {
             Path filePath = uploadPath.resolve(filename);
             Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            return "http://localhost:8080/uploads/" + filename;
+            return "http://192.168.0.23:8080/uploads/" + filename;
         } catch (IOException e) {
             throw new RuntimeException("Ошибка сохранения фото из Telegram", e);
         }
@@ -90,7 +83,7 @@ public class FileUploadService {
             String filename = UUID.randomUUID() + extension;
             Path filePath = uploadPath.resolve(filename);
             file.transferTo(filePath.toFile());
-            return "http://localhost:8080/uploads/" + filename;
+            return "http://192.168.0.23:8080/uploads/" + filename;
         } catch (IOException e) {
             throw new RuntimeException("Ошибка при сохранении файла", e);
         }
@@ -106,7 +99,7 @@ public class FileUploadService {
 
             Path filePath = uploadPath.resolve(filename);
             Files.write(filePath, bytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            return "http://localhost:8080/uploads/" + filename;
+            return "http://192.168.0.23:8080/uploads/" + filename;
         } catch (IOException e) {
             throw new RuntimeException("Ошибка сохранения файла", e);
         }

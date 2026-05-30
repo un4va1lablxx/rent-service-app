@@ -54,7 +54,6 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/password-reset/start",
                                 "/api/auth/password-reset/confirm",
-                                "/api/auth/sms-code",
                                 "/api/auth/telegram/register/start",
                                 "/api/auth/telegram/login/start",
                                 "/api/auth/telegram/status/*",

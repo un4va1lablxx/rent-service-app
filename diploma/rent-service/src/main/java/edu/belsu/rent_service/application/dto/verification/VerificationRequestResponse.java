@@ -19,7 +19,6 @@ public record VerificationRequestResponse(
         String verificationType,
         String status,
         String cadastralNumber,
-        String gosuslugiId,
         String failureReason,
         String requestData,
         String responseData,

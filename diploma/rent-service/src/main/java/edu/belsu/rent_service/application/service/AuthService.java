@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,11 +32,11 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
-    private final SmsCodeService smsCodeService;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
     private final TelegramVerificationService telegramVerificationService;
     private final SensitiveDataService sensitiveDataService;
+    private final UserReviewStatsService userReviewStatsService;
     private final Map<String, PendingTelegramAuth> pendingTelegramAuth = new ConcurrentHashMap<>();
     private final Map<String, PendingPasswordReset> pendingPasswordResets = new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
@@ -47,18 +46,18 @@ public class AuthService {
 
     public AuthService(UserRepository userRepository,
                        JwtService jwtService,
-                       SmsCodeService smsCodeService,
                        RoleService roleService,
                        PasswordEncoder passwordEncoder,
                        TelegramVerificationService telegramVerificationService,
-                       SensitiveDataService sensitiveDataService) {
+                       SensitiveDataService sensitiveDataService,
+                       UserReviewStatsService userReviewStatsService) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
-        this.smsCodeService = smsCodeService;
         this.roleService = roleService;
         this.passwordEncoder = passwordEncoder;
         this.telegramVerificationService = telegramVerificationService;
         this.sensitiveDataService = sensitiveDataService;
+        this.userReviewStatsService = userReviewStatsService;
     }
 
     @Transactional
@@ -75,12 +74,9 @@ public class AuthService {
         String defaultRole = userRepository.count() == 0 ? "admin" : "user";
         User user = User.builder()
                 .phoneNumber(phoneNumber)
-                .encryptedPhone(phoneNumber)
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .fullName(request.fullName().trim())
                 .role(roleService.normalizeRole(defaultRole))
-                .preferredMessenger("web")
-                .lastSeenAt(LocalDateTime.now())
                 .build();
 
         return buildAuthResponse(userRepository.save(user));
@@ -99,7 +95,6 @@ public class AuthService {
             throw new ApiException("Неверный пароль");
         }
 
-        user.setLastSeenAt(LocalDateTime.now());
         return buildAuthResponse(userRepository.save(user));
     }
 
@@ -112,6 +107,7 @@ public class AuthService {
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ApiException("Пользователь не найден"));
 
+        UserReviewStatsService.UserReviewStats stats = userReviewStatsService.getStats(user.getId());
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .phoneNumber(user.getPhoneNumber())
@@ -121,52 +117,25 @@ public class AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole())
                 .verificationStatus(user.getVerificationStatus())
-                .rating(user.getRating())
-                .reviewsCount(user.getReviewsCount())
-                .landlordRating(user.getLandlordRating())
-                .landlordReviewsCount(user.getLandlordReviewsCount())
-                .tenantRating(user.getTenantRating())
-                .tenantReviewsCount(user.getTenantReviewsCount())
-                .trustLevel(user.getTrustLevel())
+                .rating(stats.rating())
+                .reviewsCount(stats.reviewsCount())
+                .landlordRating(stats.landlordRating())
+                .landlordReviewsCount(stats.landlordReviewsCount())
+                .tenantRating(stats.tenantRating())
+                .tenantReviewsCount(stats.tenantReviewsCount())
+                .trustLevel(stats.trustLevel())
                 .passportCitizenship(sensitiveDataService.decrypt(user.getPassportCitizenshipEncrypted()))
                 .passportNumber(sensitiveDataService.decrypt(user.getPassportNumberEncrypted()))
                 .passportIssuedBy(sensitiveDataService.decrypt(user.getPassportIssuedByEncrypted()))
                 .passportIssuedAt(sensitiveDataService.decrypt(user.getPassportIssuedAtEncrypted()))
                 .passportRegistrationAddress(sensitiveDataService.decrypt(user.getPassportRegistrationAddressEncrypted()))
                 .payoutBankName(user.getPayoutBankName())
-                .payoutAccountNumber(user.getPayoutAccountNumber())
-                .payoutCardCvc(user.getPayoutCardCvc())
-                .payoutCardExpiry(user.getPayoutCardExpiry())
-                .verified(user.isVerified())
-                .smsVerified(user.isSmsVerified())
-                .gosuslugiVerified(user.isGosuslugiVerified())
+                .payoutAccountNumber(sensitiveDataService.decryptCardNumberOrOriginal(user.getPayoutAccountNumber()))
+                .verified(userReviewStatsService.isVerified(user.getVerificationStatus()))
                 .blocked(user.isBlocked())
                 .build();
     }
 
-    @Transactional
-    public void issueSmsCode(String phoneNumber, String purpose) {
-        smsCodeService.issueCode(phoneNumber, purpose);
-    }
-
-    @Transactional
-    public AuthResponse authenticateUser(String phoneNumber, String smsCode) {
-        String normalizedPhone = normalizePhone(phoneNumber);
-        User user = userRepository.findByPhoneNumber(normalizedPhone)
-                .orElseThrow(() -> new ApiException("Пользователь не найден"));
-
-        if (user.isBlocked()) {
-            throw new ApiException("Пользователь заблокирован");
-        }
-
-        smsCodeService.verifyCode(normalizedPhone, "login", smsCode);
-        user.setSmsVerified(true);
-        user.setVerified(true);
-        user.setLastSeenAt(LocalDateTime.now());
-        user.setPreferredMessenger("telegram");
-
-        return buildAuthResponse(userRepository.save(user));
-    }
 
     public TelegramAuthStartResponse startTelegramRegistration(TelegramAuthStartRequest request) {
         String phoneNumber = normalizePhone(request.phoneNumber());
@@ -231,16 +200,11 @@ public class AuthService {
         String defaultRole = userRepository.count() == 0 ? "admin" : "user";
         User user = User.builder()
                 .phoneNumber(normalizedPhone)
-                .encryptedPhone(normalizedPhone)
                 .passwordHash(passwordEncoder.encode(password))
                 .fullName(fullName.trim())
                 .telegramId(telegramId)
                 .telegramUsername(telegramUsername)
                 .role(roleService.normalizeRole(defaultRole))
-                .preferredMessenger("telegram")
-                .smsVerified(true)
-                .verified(true)
-                .lastSeenAt(LocalDateTime.now())
                 .build();
         return buildAuthResponse(userRepository.save(user));
     }
@@ -264,10 +228,6 @@ public class AuthService {
 
         user.setTelegramId(telegramId);
         user.setTelegramUsername(telegramUsername);
-        user.setPreferredMessenger("telegram");
-        user.setSmsVerified(true);
-        user.setVerified(true);
-        user.setLastSeenAt(LocalDateTime.now());
         return buildAuthResponse(userRepository.save(user));
     }
 
@@ -311,7 +271,6 @@ public class AuthService {
             throw new ApiException("Новый пароль не может совпадать со старым");
         }
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        user.setLastSeenAt(LocalDateTime.now());
         userRepository.save(user);
         pendingPasswordResets.remove(phoneNumber);
     }
@@ -326,7 +285,9 @@ public class AuthService {
     }
 
     private String normalizePhone(String phoneNumber) {
-        smsCodeService.validatePhone(phoneNumber);
+        if (phoneNumber == null || !phoneNumber.matches("^\\+?[0-9]{10,15}$")) {
+            throw new ApiException("Phone must match +79991234567 format");
+        }
         return phoneNumber.trim();
     }
 

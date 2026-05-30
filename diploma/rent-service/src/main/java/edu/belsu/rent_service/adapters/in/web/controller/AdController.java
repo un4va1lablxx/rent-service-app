@@ -3,7 +3,6 @@ package edu.belsu.rent_service.adapters.in.web.controller;
 import edu.belsu.rent_service.application.dto.ad.AdDetailsResponse;
 import edu.belsu.rent_service.application.dto.ad.AdRequest;
 import edu.belsu.rent_service.application.dto.ad.AdSummaryResponse;
-import edu.belsu.rent_service.application.dto.auth.AuthResponse;
 import edu.belsu.rent_service.application.service.AdService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
