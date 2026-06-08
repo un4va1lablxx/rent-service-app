@@ -30,14 +30,20 @@ public class TelegramBot {
     @Value("${telegram.bot.token}")
     private String botToken;
 
-    @Value("${telegram.bot.proxy.host:127.0.0.1}")
+    @Value("${telegram.bot.proxy.enabled:false}")
+    private boolean proxyEnabled;
+
+    @Value("${telegram.bot.proxy.host:}")
     private String proxyHost;
 
-    @Value("${telegram.bot.proxy.port:10808}")
+    @Value("${telegram.bot.proxy.port:0}")
     private int proxyPort;
 
     @Value("${rent.web-app-url:http://192.168.0.23:5173}")
     private String webAppUrl;
+
+    @Value("${rent.api-base-url:http://localhost:8080}")
+    private String apiBaseUrl;
 
     @Value("${rent.mobile-deep-link-scheme:rentservice}")
     private String mobileDeepLinkScheme;
@@ -417,7 +423,7 @@ public class TelegramBot {
                 params.add("rooms=" + rooms);
             }
 
-            String url = "http://192.168.0.23:8080/api/ads?" + String.join("&", params);
+            String url = apiBase() + "/api/ads?" + String.join("&", params);
             System.out.println("🔍 ПОЛНЫЙ URL ЗАПРОСА: " + url);
 
             HttpURLConnection conn = createConnection(url);
@@ -582,7 +588,7 @@ public class TelegramBot {
     }
 
     private String buildChatUrl(AdSummaryResponse ad) {
-        String base = webAppUrl.endsWith("/") ? webAppUrl.substring(0, webAppUrl.length() - 1) : webAppUrl;
+        String base = webBase();
         String appLink = mobileDeepLinkScheme + "://chat?adId=" + ad.id()
                 + (ad.ownerId() != null ? "&sellerId=" + ad.ownerId() : "")
                 + "&adTitle=" + URLEncoder.encode(nullSafe(ad.title()), StandardCharsets.UTF_8)
@@ -599,7 +605,7 @@ public class TelegramBot {
             return Optional.empty();
         }
         try {
-            String url = "http://192.168.0.23:8080/api/ads/" + adId;
+            String url = apiBase() + "/api/ads/" + adId;
             HttpURLConnection conn = createConnection(url);
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/json");
@@ -707,14 +713,11 @@ public class TelegramBot {
 
     private String getFullPhotoUrl(String photoPath) {
         if (photoPath == null) return null;
-        // Если уже полный URL, возвращаем как есть
         if (photoPath.startsWith("http")) return photoPath;
-        // Если относительный путь, добавляем базовый URL
         if (photoPath.startsWith("/uploads/")) {
-            return "http://192.168.0.23:8080" + photoPath;
+            return apiBase() + photoPath;
         }
-        // Если просто имя файла
-        return "http://192.168.0.23:8080/uploads/" + photoPath;
+        return apiBase() + "/uploads/" + photoPath;
     }
 
     private List<Integer> sendPhotoAlbum(long chatId, List<String> photoUrls) {
@@ -960,6 +963,22 @@ public class TelegramBot {
         } catch (Exception e) {
             System.err.println("Ошибка ответа callback: " + e.getMessage());
         }
+    }
+
+    private String normalizeBaseUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String trimmed = value.trim();
+        return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+    }
+
+    private String apiBase() {
+        return normalizeBaseUrl(apiBaseUrl);
+    }
+
+    private String webBase() {
+        return normalizeBaseUrl(webAppUrl);
     }
 
     private Path resolveLocalPhotoPath(String photoUrl) {
@@ -1309,8 +1328,7 @@ public class TelegramBot {
             return;
         }
         if (!session.canPublishAds()) {
-            sendMessage(chatId, "Публикация доступна только арендодателям. Получите статус собственника в личном кабинете платформы на веб-сайте: http://localhost:5173");
-            return;
+            sendMessage(chatId, "Публикация доступна только арендодателям. Получите статус собственника в личном кабинете платформы на веб-сайте: " + webBase());            return;
         }
         session.setState(UserState.CREATING_AD);
         session.resetAdData();
@@ -1526,15 +1544,16 @@ public class TelegramBot {
 
     private HttpURLConnection createConnection(String urlString) throws Exception {
         URL url = new URL(urlString);
-        HttpURLConnection conn;
 
-        if (isLocalOrPrivateHost(url.getHost())) {
-            conn = (HttpURLConnection) url.openConnection();
-        } else {
+        if (proxyEnabled && proxyHost != null && !proxyHost.isBlank() && proxyPort > 0) {
             Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, proxyPort));
-            conn = (HttpURLConnection) url.openConnection(proxy);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection(proxy);
+            conn.setConnectTimeout(30000);
+            conn.setReadTimeout(30000);
+            return conn;
         }
 
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setConnectTimeout(30000);
         conn.setReadTimeout(30000);
         return conn;
