@@ -27,6 +27,11 @@ build/
 /.nb-gradle/
 .env.local
 .env
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.vercel/
 
 # --- Logs and System Files ---
 *.log
