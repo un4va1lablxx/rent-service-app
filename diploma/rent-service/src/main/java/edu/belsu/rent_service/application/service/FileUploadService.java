@@ -22,26 +22,22 @@ public class FileUploadService {
     @Value("${file.upload-dir:./uploads}")
     private String uploadDir;
 
+    @Value("${app.public-base-url:http://localhost:8080}")
+    private String publicBaseUrl;
+
     public List<String> savePhotos(List<MultipartFile> files, Authentication authentication) {
         List<String> urls = new ArrayList<>();
 
         try {
-            String basePath = System.getProperty("user.dir");
-            Path uploadPath = Paths.get(basePath, uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            Path uploadPath = getUploadPath();
+
             for (MultipartFile file : files) {
-                String originalFilename = file.getOriginalFilename();
-                String extension = "";
-                if (originalFilename != null && originalFilename.contains(".")) {
-                    extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-                }
-                String filename = UUID.randomUUID().toString() + extension;
+                String filename = generateSafeFilename(file.getOriginalFilename());
                 Path filePath = uploadPath.resolve(filename);
+
                 file.transferTo(filePath.toFile());
-                String url = "http://192.168.0.23:8080/uploads/" + filename;
-                urls.add(url);
+
+                urls.add(buildPublicUrl(filename));
             }
         } catch (IOException e) {
             throw new RuntimeException("Ошибка при сохранении файлов: " + e.getMessage(), e);
@@ -52,16 +48,14 @@ public class FileUploadService {
 
     public String savePhotoFromStream(InputStream inputStream, String filename) {
         try {
-            String basePath = System.getProperty("user.dir");
-            Path uploadPath = Paths.get(basePath, "./uploads");
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            Path uploadPath = getUploadPath();
 
-            Path filePath = uploadPath.resolve(filename);
+            String safeFilename = sanitizeFilename(filename);
+            Path filePath = uploadPath.resolve(safeFilename);
+
             Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
 
-            return "http://192.168.0.23:8080/uploads/" + filename;
+            return buildPublicUrl(safeFilename);
         } catch (IOException e) {
             throw new RuntimeException("Ошибка сохранения фото из Telegram", e);
         }
@@ -69,21 +63,14 @@ public class FileUploadService {
 
     public String saveMultipartFile(MultipartFile file) {
         try {
-            String basePath = System.getProperty("user.dir");
-            Path uploadPath = Paths.get(basePath, "./uploads");
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            Path uploadPath = getUploadPath();
 
-            String originalFilename = file.getOriginalFilename();
-            String extension = "";
-            if (originalFilename != null && originalFilename.contains(".")) {
-                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
-            String filename = UUID.randomUUID() + extension;
+            String filename = generateSafeFilename(file.getOriginalFilename());
             Path filePath = uploadPath.resolve(filename);
+
             file.transferTo(filePath.toFile());
-            return "http://192.168.0.23:8080/uploads/" + filename;
+
+            return buildPublicUrl(filename);
         } catch (IOException e) {
             throw new RuntimeException("Ошибка при сохранении файла", e);
         }
@@ -91,17 +78,65 @@ public class FileUploadService {
 
     public String saveFile(byte[] bytes, String filename) {
         try {
-            String basePath = System.getProperty("user.dir");
-            Path uploadPath = Paths.get(basePath, "./uploads");
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            Path uploadPath = getUploadPath();
 
-            Path filePath = uploadPath.resolve(filename);
-            Files.write(filePath, bytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            return "http://192.168.0.23:8080/uploads/" + filename;
+            String safeFilename = sanitizeFilename(filename);
+            Path filePath = uploadPath.resolve(safeFilename);
+
+            Files.write(
+                    filePath,
+                    bytes,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING
+            );
+
+            return buildPublicUrl(safeFilename);
         } catch (IOException e) {
             throw new RuntimeException("Ошибка сохранения файла", e);
         }
+    }
+
+    private Path getUploadPath() throws IOException {
+        Path path = Paths.get(uploadDir);
+
+        if (!path.isAbsolute()) {
+            path = Paths.get(System.getProperty("user.dir")).resolve(uploadDir);
+        }
+
+        path = path.normalize();
+
+        if (!Files.exists(path)) {
+            Files.createDirectories(path);
+        }
+
+        return path;
+    }
+
+    private String buildPublicUrl(String filename) {
+        String base = publicBaseUrl == null ? "" : publicBaseUrl.trim();
+
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+
+        return base + "/uploads/" + filename;
+    }
+
+    private String generateSafeFilename(String originalFilename) {
+        String extension = "";
+
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+
+        return UUID.randomUUID() + extension;
+    }
+
+    private String sanitizeFilename(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return UUID.randomUUID().toString();
+        }
+
+        return Paths.get(filename).getFileName().toString();
     }
 }
