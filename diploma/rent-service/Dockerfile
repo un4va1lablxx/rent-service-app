@@ -13,6 +13,9 @@ WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
 
+RUN mkdir -p /app/uploads
+COPY uploads /app/uploads
+
 EXPOSE 8080
 
 CMD ["java", "-jar", "app.jar"]
