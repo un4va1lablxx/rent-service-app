@@ -25,6 +25,8 @@ build/
 /dist/
 /nbdist/
 /.nb-gradle/
+.env.local
+.env
 
 # --- Logs and System Files ---
 *.log
