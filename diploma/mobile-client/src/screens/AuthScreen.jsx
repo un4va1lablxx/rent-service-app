@@ -1,7 +1,8 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
     ActivityIndicator,
     Image,
+    Keyboard,
     KeyboardAvoidingView,
     Linking,
     Platform,
@@ -12,6 +13,9 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+
+const TELEGRAM_ICON = require("../../assets/telegram.png");
+const EYE_ICON = require("../../assets/eye.png");
 
 export function AuthScreen(props) {
     // Деструктурируем все переданные пропсы без изменений структуры
@@ -44,6 +48,9 @@ export function AuthScreen(props) {
         handlePasswordResetSubmit,
     } = props;
 
+    const [showPassword, setShowPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+
     // Массив ссылок для управления фокусом в ячейках ввода кода
     const codeRefs = useRef([]);
 
@@ -59,6 +66,7 @@ export function AuthScreen(props) {
 
     // Адаптер для вызова веб-событий отправки формы
     const triggerSubmit = (submitHandler) => {
+        Keyboard.dismiss();
         if (submitHandler) {
             submitHandler({ preventDefault: () => {} });
         }
@@ -154,15 +162,28 @@ export function AuthScreen(props) {
                                             onChangeText={setPassword}
                                             placeholder="Минимум 6 символов"
                                             placeholderTextColor="#A2A2A7"
-                                            secureTextEntry={true}
+                                            secureTextEntry={!showPassword}
                                         />
+                                        <TouchableOpacity
+                                            style={styles.eyeButton}
+                                            onPress={() => {
+                                                Keyboard.dismiss();
+                                                setShowPassword((value) => !value);
+                                            }}
+                                            accessibilityRole="button"
+                                        >
+                                            <Image source={EYE_ICON} style={[styles.eyeIcon, showPassword && styles.eyeIconActive]} />
+                                        </TouchableOpacity>
                                     </View>
 
                                     {/* Ссылка "Забыли пароль?" */}
                                     {authMode === "login" && (
                                         <TouchableOpacity
                                             style={styles.forgotPasswordContainer}
-                                            onPress={handleForgotPassword}
+                                            onPress={() => {
+                                                Keyboard.dismiss();
+                                                handleForgotPassword();
+                                            }}
                                             disabled={loadingMap["forgot-send"]}
                                         >
                                             <Text style={styles.accentLinkText}>
@@ -197,6 +218,7 @@ export function AuthScreen(props) {
                                         </Text>
                                         <TouchableOpacity
                                             onPress={() => {
+                                                Keyboard.dismiss();
                                                 setAuthMode(authMode === "login" ? "register" : "login");
                                                 setError("");
                                                 setNotice("");
@@ -221,11 +243,14 @@ export function AuthScreen(props) {
                                     <View style={styles.socialAuthRow}>
                                         <TouchableOpacity
                                             disabled={loadingMap["telegram-auth"]}
-                                            onPress={handleTelegramAuth}
+                                            onPress={() => {
+                                                Keyboard.dismiss();
+                                                handleTelegramAuth();
+                                            }}
                                             style={[styles.telegramCircleButton, loadingMap["telegram-auth"] ? { opacity: 0.6 } : null]}
                                         >
                                             {/* Используем текстовую замену или иконку. Для надежности выведем сокращенный бренд-текст */}
-                                            <Text style={styles.telegramCircleButtonText}>TG</Text>
+                                            <Image source={TELEGRAM_ICON} style={styles.telegramIcon} />
                                         </TouchableOpacity>
                                     </View>
 
@@ -253,7 +278,6 @@ export function AuthScreen(props) {
                                         key={index}
                                         ref={(el) => (codeRefs.current[index] = el)}
                                         style={styles.resetCodeInput}
-                                        type="text"
                                         keyboardType="numeric"
                                         maxLength={1}
                                         value={digit}
@@ -269,7 +293,7 @@ export function AuthScreen(props) {
                                             if (e.nativeEvent.key === "Backspace" && !digit && index > 0) {
                                                 codeRefs.current[index - 1]?.focus();
                                             }
-                                            handleResetCodeKeyDown(index, {
+                                            handleResetCodeKeyDown?.(index, {
                                                 key: e.nativeEvent.key,
                                                 preventDefault: () => {}
                                             });
@@ -285,10 +309,20 @@ export function AuthScreen(props) {
                                     style={styles.input}
                                     value={newPassword}
                                     onChangeText={setNewPassword}
-                                    placeholder="Минимум 6 symbols"
+                                    placeholder="Введите новый пароль"
                                     placeholderTextColor="#A2A2A7"
-                                    secureTextEntry={true}
+                                    secureTextEntry={!showNewPassword}
                                 />
+                                <TouchableOpacity
+                                    style={styles.eyeButton}
+                                    onPress={() => {
+                                        Keyboard.dismiss();
+                                        setShowNewPassword((value) => !value);
+                                    }}
+                                    accessibilityRole="button"
+                                >
+                                    <Image source={EYE_ICON} style={[styles.eyeIcon, showNewPassword && styles.eyeIconActive]} />
+                                </TouchableOpacity>
                             </View>
 
                             {/* Ошибки и уведомления */}
@@ -312,6 +346,7 @@ export function AuthScreen(props) {
                             <TouchableOpacity
                                 style={styles.ghostButton}
                                 onPress={() => {
+                                    Keyboard.dismiss();
                                     setAuthView("form");
                                     setError("");
                                     setNotice("");
@@ -381,6 +416,7 @@ const styles = StyleSheet.create({
     field: {
         marginBottom: 16,
         width: "100%",
+        position: "relative",
     },
     fieldLabel: {
         fontSize: 14,
@@ -395,8 +431,34 @@ const styles = StyleSheet.create({
         backgroundColor: "#E5E5EA",
         borderRadius: 12,
         paddingHorizontal: 16,
+        paddingRight: 52,
         fontSize: 15,
         color: "#1C1C1E",
+    },
+    passwordInputWrap: {
+        position: "relative",
+        width: "100%",
+    },
+    passwordInput: {
+        paddingRight: 52,
+    },
+    eyeButton: {
+        position: "absolute",
+        right: 6,
+        bottom: 4,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    eyeIcon: {
+        width: 22,
+        height: 22,
+        tintColor: "#3A3A3C",
+    },
+    eyeIconActive: {
+        tintColor: "#007AFF",
     },
     forgotPasswordContainer: {
         alignSelf: "flex-end",
@@ -511,6 +573,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 4,
+    },
+    telegramIcon: {
+        width: 28,
+        height: 28,
+        resizeMode: "contain",
     },
     telegramCircleButtonText: {
         color: "#FFFFFF",

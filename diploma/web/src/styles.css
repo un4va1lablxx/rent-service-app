@@ -360,13 +360,16 @@ img {
 
 .icon-button {
   width: 42px;
+  min-width: 42px;
   height: 42px;
+  min-height: 42px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.82);
   box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.06);
   color: var(--text);
+  flex: 0 0 42px;
 }
 
 .telegram-auth-button {
@@ -403,7 +406,9 @@ img {
 .icon-button svg,
 .modal-close svg {
   width: 18px;
+  min-width: 18px;
   height: 18px;
+  min-height: 18px;
 }
 
 .auth-tabs,
@@ -551,6 +556,24 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 0.9rem;
+}
+
+.topbar-nav button {
+  display: inline-flex;
+  align-items: center;
+}
+
+.topbar-nav .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  line-height: 1;
 }
 
 .brand-mark {
@@ -899,6 +922,27 @@ img {
   background: transparent;
   text-align: left;
   border: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.listing-title-button h3 {
+  overflow-wrap: anywhere;
+}
+
+.listing-header .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.45rem;
+  padding: 0.35rem 0.6rem;
+  line-height: 1;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.listing-header .icon-button {
+  flex: 0 0 42px;
 }
 
 .pill-row {
@@ -4226,9 +4270,16 @@ th {
 }
 
 .actions-cell {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.actions-cell .small-btn {
+  margin: 0.15rem 0.45rem 0.15rem 0;
+}
+
+.actions-cell .small-btn:last-child {
+  margin-right: 0;
 }
 
 .small-btn {
@@ -4298,6 +4349,10 @@ th {
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.14);
   backdrop-filter: none;
+}
+
+.notifications-dropdown-portal {
+  display: none;
 }
 
 .notifications-head-actions {
@@ -4760,7 +4815,7 @@ th {
   }
 
   .actions-cell {
-    flex-direction: column;
+    white-space: normal;
   }
 
   .admin-modal {
@@ -5098,5 +5153,791 @@ th {
   .seller-count,
   .seller-rating {
     font-size: 1.1rem;
+  }
+}
+
+/* Focused adaptive fixes for the web version */
+.owner-name-with-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  line-height: 1.18;
+}
+
+.owner-name-badge-tail,
+.seller-profile-name-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.owner-name-badge-tail .verification-badge,
+.seller-profile-name-tail .verification-badge {
+  flex: 0 0 auto;
+}
+
+.details-owner-card .owner-name-with-badge,
+.details-owner-card .owner-name-with-badge span {
+  color: inherit;
+  margin-top: 0;
+}
+
+.details-owner-card .owner-name-with-badge > span:first-child {
+  display: inline;
+}
+
+.seller-profile-name {
+  margin-bottom: 0;
+}
+
+.seller-profile-name-tail {
+  margin-left: 0.35rem;
+}
+
+.details-owner-card .details-owner-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.details-owner-card .details-owner-identity {
+  display: contents;
+}
+
+.details-owner-card .listing-owner-avatar {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.details-owner-card .details-owner-copy {
+  grid-column: 2;
+  min-width: 0;
+  width: 100%;
+}
+
+.details-owner-card .details-owner-name-row {
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+
+.details-owner-card .owner-name-with-badge {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  max-width: 100%;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.details-owner-card .owner-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details-owner-card .owner-name-with-badge .verification-badge {
+  flex: 0 0 auto;
+}
+
+.details-owner-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+  width: 100%;
+  margin-top: 0.35rem;
+}
+
+.details-owner-meta-row .details-owner-rating-line {
+  justify-content: flex-start;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+}
+
+.details-owner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 0 0 auto;
+}
+
+.details-owner-action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.details-owner-card .details-owner-action-label {
+  display: inline;
+  color: inherit;
+  margin-top: 0;
+}
+
+.details-owner-action-button.primary-button,
+.details-owner-action-button.primary-button .details-owner-action-label {
+  color: #fff;
+}
+
+.details-owner-action-button svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.65rem;
+    overflow-x: hidden;
+  }
+
+  .topbar {
+    position: static;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "brand account"
+      "nav nav";
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    border-radius: 20px;
+  }
+
+  .brand-lockup {
+    grid-area: brand;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .topbar-nav-shell,
+  .topbar-nav-track {
+    display: contents;
+  }
+
+  .topbar-nav {
+    grid-area: nav;
+    width: 100%;
+    min-width: 0;
+    gap: 0.35rem;
+    padding: 0.2rem;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, 0.04);
+  }
+
+  .topbar-nav button {
+    min-height: 38px;
+    padding: 0.52rem 0.72rem;
+    font-size: 0.88rem;
+    white-space: nowrap;
+  }
+
+  .topbar-nav button.active {
+    background: #fff;
+  }
+
+  .topbar-account {
+    grid-area: account;
+    justify-self: end;
+    justify-content: flex-end;
+    width: auto;
+    min-width: 0;
+    gap: 0.45rem;
+  }
+
+  .topbar-account .icon-button,
+  .notifications-button {
+    flex: 0 0 36px;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
+
+  .topbar-mini-avatar {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+  }
+
+  .topbar-user-short {
+    max-width: 96px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nav-scroll-button {
+    display: none !important;
+  }
+
+  .notifications-dropdown {
+    position: fixed;
+    inset: auto 0.65rem 0.65rem 0.65rem;
+    width: auto;
+    max-width: none;
+    max-height: min(72dvh, 560px);
+    z-index: 2000;
+    border-radius: 20px;
+  }
+
+  .details-owner-card.glass {
+    padding: 1rem;
+  }
+
+  .details-owner-bar {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto;
+    gap: 0.45rem 0.65rem;
+    align-items: center;
+  }
+
+  .details-owner-identity {
+    display: contents;
+  }
+
+  .details-owner-identity .listing-owner-avatar {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 52px;
+    height: 52px;
+  }
+
+  .details-owner-copy {
+    display: contents;
+  }
+
+  .details-owner-name-row {
+    grid-column: 2 / -1;
+    grid-row: 1;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .details-owner-copy .owner-name-with-badge {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    min-width: 0;
+    max-width: 100%;
+    font-size: clamp(0.9rem, 3.6vw, 1rem);
+  }
+
+  .details-owner-copy .owner-name-with-badge > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .details-owner-rating-line {
+    grid-column: 2;
+    grid-row: 2;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    margin-top: 0;
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+  }
+
+  .details-owner-rating-star,
+  .details-owner-rating-score {
+    font-size: 1rem;
+  }
+
+  .details-owner-rating-count {
+    font-size: 0.84rem;
+  }
+
+  .details-owner-bar .primary-button,
+  .details-owner-bar .secondary-button {
+    width: auto;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0.62rem 0.8rem;
+    justify-content: center;
+  }
+
+  .details-owner-bar .primary-button {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .details-owner-bar .secondary-button {
+    grid-column: 4;
+    grid-row: 2;
+  }
+
+  .seller-profile-modal {
+    width: 100%;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .seller-profile-head {
+    width: min(100%, 520px);
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+    margin-inline: auto;
+  }
+
+  .seller-profile-main {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .seller-profile-main p {
+    justify-content: center;
+  }
+
+  .seller-profile-name {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    line-height: 1.18;
+    width: 100%;
+    font-size: clamp(1.25rem, 5.6vw, 1.7rem);
+  }
+
+  .seller-profile-head .primary-button {
+    width: min(100%, 260px);
+    justify-content: center;
+    margin-inline: auto;
+  }
+
+  .messages-container,
+  .chat-area,
+  .chat-header,
+  .chat-user-info,
+  .chat-user-info > div,
+  .chat-messages,
+  .chat-compose,
+  .compose-wrapper {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .messages-container {
+    width: 100%;
+    height: calc(100dvh - 1.2rem);
+    min-height: 520px;
+    border-radius: 22px;
+    overflow: hidden;
+  }
+
+  .dialogs-sidebar {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .dialog-item,
+  .dialog-info,
+  .dialog-name-row {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .dialog-name,
+  .dialog-preview,
+  .dialog-ad-title {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-area {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .chat-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    align-items: center;
+    height: auto;
+    min-height: 68px;
+    padding: 0.65rem 0.75rem;
+    overflow: hidden;
+  }
+
+  .chat-user-info {
+    gap: 0.55rem;
+  }
+
+  .chat-back-button {
+    width: 26px;
+    min-width: 26px;
+  }
+
+  .chat-avatar {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .chat-user-info h3,
+  .chat-ad-link {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-user-info h3 {
+    font-size: clamp(0.98rem, 4vw, 1.1rem);
+    line-height: 1.15;
+  }
+
+  .chat-ad-link {
+    font-size: 0.75rem;
+  }
+
+  .chat-viewing-button {
+    width: auto;
+    max-width: 112px;
+    min-width: 0;
+    padding: 0 0.65rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-messages {
+    width: 100%;
+    padding: 0.85rem;
+    overflow-x: hidden;
+  }
+
+  .chat-message {
+    max-width: 100%;
+  }
+
+  .message-bubble,
+  .system-message-body {
+    max-width: min(82vw, 360px);
+    overflow-wrap: anywhere;
+  }
+
+  .chat-compose {
+    width: 100%;
+    padding: 0.7rem;
+  }
+
+  .compose-wrapper {
+    width: 100%;
+  }
+
+  .admin-container {
+    gap: 1rem;
+  }
+
+  .admin-header,
+  .stats-container,
+  .users-container,
+  .moderation-container,
+  .verification-queue-container {
+    min-width: 0;
+    padding: 1rem;
+    border-radius: 22px;
+  }
+
+  .admin-controls-bar,
+  .admin-search-box {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-table-picker,
+  .admin-table-switch {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .admin-table-switch,
+  .admin-filter-switch {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .admin-table-switch::-webkit-scrollbar,
+  .admin-filter-switch::-webkit-scrollbar {
+    display: none;
+  }
+
+  .users-table,
+  .ads-table {
+    overflow: visible;
+  }
+
+  .users-table table,
+  .ads-table table {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    border-collapse: separate;
+  }
+
+  .users-table thead,
+  .ads-table thead {
+    display: none;
+  }
+
+  .users-table tbody,
+  .ads-table tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .users-table tr,
+  .ads-table tr {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.85rem;
+    border: 1px solid rgba(17, 17, 17, 0.08);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  .users-table td,
+  .ads-table td {
+    display: grid;
+    grid-template-columns: minmax(96px, 0.42fr) minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0;
+    border-bottom: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .users-table td::before,
+  .ads-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .users-table .actions-cell .small-btn,
+  .ads-table .actions-cell .small-btn {
+    width: 100%;
+    margin: 0;
+  }
+}
+
+@media (max-width: 460px) {
+  .topbar-account {
+    gap: 0.35rem;
+  }
+
+  .topbar-user-short {
+    max-width: 76px;
+    font-size: 0.82rem;
+  }
+
+  .topbar-account .icon-button,
+  .notifications-button {
+    flex-basis: 34px;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+  }
+
+  .topbar-mini-avatar {
+    flex-basis: 28px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .chat-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-viewing-button {
+    width: 100%;
+    max-width: none;
+    justify-self: stretch;
+  }
+
+  .message-bubble,
+  .system-message-body {
+    max-width: min(78vw, 320px);
+  }
+
+  .users-table td,
+  .ads-table td {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.2rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .details-owner-card .details-owner-bar {
+    grid-template-columns: 52px minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 0.65rem;
+  }
+
+  .details-owner-card .details-owner-identity {
+    display: contents;
+  }
+
+  .details-owner-card .details-owner-copy {
+    display: block;
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .details-owner-card .details-owner-name-row {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .details-owner-card .owner-name-with-badge {
+    width: 100%;
+    font-size: clamp(0.94rem, 3.8vw, 1.05rem);
+  }
+
+  .details-owner-meta-row {
+    gap: 0.45rem;
+    margin-top: 0.38rem;
+  }
+
+  .details-owner-meta-row .details-owner-rating-line {
+    grid-column: auto;
+    grid-row: auto;
+    width: auto;
+    gap: 0.25rem;
+  }
+
+  .details-owner-rating-count {
+    font-size: 0.82rem;
+  }
+
+  .details-owner-actions {
+    gap: 0.35rem;
+  }
+
+  .details-owner-action-button {
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px;
+    min-height: 38px !important;
+    padding: 0 !important;
+    border-radius: 999px;
+    justify-content: center;
+  }
+
+  .details-owner-action-label {
+    display: none !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .details-owner-card .details-owner-bar {
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 0.55rem;
+  }
+
+  .details-owner-identity .listing-owner-avatar {
+    width: 46px;
+    height: 46px;
+  }
+
+  .details-owner-rating-count {
+    max-width: 58px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .details-owner-action-button {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px;
+    min-height: 34px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .notifications-dropdown {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 0px) + 8.75rem) !important;
+    right: 0.65rem !important;
+    bottom: auto !important;
+    left: 0.65rem !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 9.5rem);
+    overflow-y: auto;
+    z-index: 3000;
+  }
+}
+
+@media (max-width: 460px) {
+  .notifications-dropdown {
+    top: calc(env(safe-area-inset-top, 0px) + 8.25rem) !important;
+    max-height: calc(100dvh - 9rem);
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar-account > .notifications-dropdown {
+    display: none !important;
+  }
+
+  .notifications-dropdown-portal {
+    display: grid !important;
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 0px) + 8.75rem) !important;
+    right: 0.65rem !important;
+    bottom: auto !important;
+    left: 0.65rem !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 9.5rem);
+    overflow-y: auto;
+    z-index: 10000;
+  }
+}
+
+@media (max-width: 460px) {
+  .notifications-dropdown-portal {
+    top: calc(env(safe-area-inset-top, 0px) + 8.25rem) !important;
+    max-height: calc(100dvh - 9rem);
   }
 }

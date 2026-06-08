@@ -119,7 +119,7 @@ export default function ImageUploader({ existingImages = [], onImagesUploaded })
                         <TouchableOpacity style={styles.removeButton} onPress={() => removeImage(index)}>
                             <Text style={styles.removeButtonText}>×</Text>
                         </TouchableOpacity>
-                        <View style={styles.sortControls}>
+                        {false && <View style={styles.sortControls}>
                             {index > 0 && (
                                 <TouchableOpacity style={styles.sortArrow} onPress={() => moveImage(index, index - 1)}>
                                     <Text style={styles.arrowText}>‹</Text>
@@ -130,7 +130,7 @@ export default function ImageUploader({ existingImages = [], onImagesUploaded })
                                     <Text style={styles.arrowText}>›</Text>
                                 </TouchableOpacity>
                             )}
-                        </View>
+                        </View>}
                     </View>
                 ))}
 

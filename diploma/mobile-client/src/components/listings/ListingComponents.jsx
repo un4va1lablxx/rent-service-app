@@ -1,7 +1,9 @@
 ﻿import React, { useState } from "react";
 // Импортируем базовые компоненты React Native
 import {
+  Alert,
   Image,
+  Modal as NativeModal,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,9 +15,9 @@ import { compactName, fallbackImage, formatArea, formatPriceWithType, propertyLa
 import { assetUrl } from "../../lib/api";
 import { Fact, Icon, Modal } from "../ui";
 
+const EYE_ICON = require("../../../assets/eye.png");
 const OWNER_VERIFIED_BADGE_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAACXBIWXMAAAsTAAALEwEAmpwYAAADvklEQVR4nO2aSWsUURCAa9w9RxQRd68aJRdRXC9xAU9Go4lrJKLBmVc9QvA0B/0D6t2j4EFFIXrIRXLw5NGD2Uy6qhNJIJqECIJLS70eMnbP9Di9zHQLFtRppt+r71W96lf1GuC/eCT/aS3cGloJtUphbJV+JlVSsJcA8gAgMSjOVQXqfrccFHeDYgsUvwGwM5AaUdQDyHZJydTGFuxlLljDagPFI+7/8nVIhRjWRkCe8xjnqKJBUNQByJ2geLjyf3gWkDYkjQGg+EVFA4Ooor6EIagjMkQpHNvraKmdgR6rCZS5DZCbQU3shxy1OrFO1wBpOjYQRVN6X8nYOT4OOToIebNFz62zW5SkkB1dF9+KR9Qeqyk8CNKOxAGwqLmxLeFBDGtP4gC4uId2hgeROE0cgB01rH3hQRSfTE9oUWt4EMM8mzgAFlXx6QgekRSbAggUpa6Q3tDviqkUeeSzfs/U7oXx9YD0NHHD0dczryA7sakKgZ0B5IugeCZ5Y/lvMF8BuVefqF0iRwCpDRpv0C9Q/DrCGAPu4kyqNSmKGg2BnHXCme+FGkMRlRdxSDcbBqHoJ+Toqmf+l8HHqbT5nRL0YwM88QOUdckD0Q6KvgdcjHEovF+RzHtDjJUaxg3RpT0UdCzDvOyfuByvDIdwcS3PfAPDPFUeznqvBF2QQVc/oKJICg4WKk/0AiA/CAShGxYhIFDPeb46RNDyVVJnm73UedDOgOKHFVZvARQf9SzWnYhh2lkdQoxC+hDAxQuQ48OlAQSG7rt+Rz7igeiNCGHrUK4aWkhXQsSrH8wXQN7r9jbfjQyBRfWm71jSr6J53Zj4EyY/udnXU3Go8ku/0vGLNvACIB0qH9hn78ShhnnDPZeQIY/FsEpuGNlzih/VBQK1TgLS6hKIHLx0EzoWl8/r+lo2I/LjOkLY+qBb3tG3M9pVfn3coDBI/XUEmHWa39WadlJQXX5W15WMtkh9unEeqNSNsyUa3QszwUpd74EuPZ64Fg5i0StpAbHOhAdBOpY4AC7qifAg8rZOjUfMA+FBsrwrcQAsas7aHR4kP741cQAs6m1ze3gQY2JN4gBY1Gh38nKKlZ6XXH+ZLfqaQa7FnGvm7nhbqjStU6y+eqPW4v5s1nPr26p63sdL9yO2PUDn6mdoTTD8/N+/nhaRy37nEFfBQB4BxRecPgAN+YDMBTs71VO8RZm0Mr3fpJQ+4RiuXhwlKtLJp/7i5u/VvWQ/cVpH0nIaBaS35R31pEWyWzUAr4i3UveZEyQvvwFe/tNTzJCI2wAAAABJRU5ErkJggg==";
 const TRUSTED_PARTNER_BADGE_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEIAAABCCAYAAADjVADoAAAACXBIWXMAAAsTAAALEwEAmpwYAAERklEQVR4nO2bW4gcVRCGD6sRDepM1WzURSEqXhAVRbwrah6CCCIIXh5EH1SUPIiC4oOgDbtd1ROTKFEk5kHwKcr4Eja7U9W7ykBEELIqooiEjREveMkF1CjrJYmcTpR1dMzk9Onp7pn5oaDp6e6q+rrP6Z5T5xgz1FBDDVVgVeKJsyoSnWkGVSB8DSp9jMoHExP+CJvh1WaQBEJ3gdIvf0M4bMm+mO4w/a4zGutOQOXVKHSgHcIi2w9C4fJWcLzpOzWC40DoYVT+/H8A/NOEdmCTHjBzG5eYUqvROMa2eRB+AZV2dQ2gvbkIfQdCz9eafIUJghFTdFVaQbUm0U2o/BgKvY5Cu12T72y0C4VfQ6FHq026EWbrlfwSnooANbwflNaD0mYQmgPhb/0n3eUTo/QNCG9LYlFab2OzNyVTCNiMbkelvXkl3X3/wntqwrdlAgGa9etR+Pfck+waBv0GOnGtdxAo/E7uyR210dteIVRaQfUI7/6i2n6vHerozPi5BUjKyZYpn+MPxDSfl3dCrmZjH4LQsoAQ/gKV1iWWbA8gCBDehs3g5L982G1Qfm/gQKCGV7b7sfsGDARNd/KFws2BAQExXdcRRMxX9S0IEP4Jld5HpQYoP3Ekf/YYe6w959C5JQcBSrMQ00Vp/cN0/WJQfrOcIIR2+BxuS4b5hD8rIQheazwLhJ8rHwill4xnodKGXEFUZqOzHZrG7lEJx3zFYK/lMvxnYzdeg1CHzlLoEx8wTo3XnILKH7rEsGzq2dP8jkfo0QeRwFD+FLeEp7v6tokkVTBH/4s/49MrCEbs0JczDOHttrbhVg/h7c4QlBa8lwBQaWeKgPY6+xXe4+6X571CsELlrSkC2mpy8AtKLVe/Xl9di56IDcZRqPyye5OkF41vwaHapeuntedzZb/K/w/EG2Nqpb9VmwstTgBjvdN3q1MRyax1BCIWufqsaXZJNUVfdqlyg/NWJk2tH21+LhwvEC9bsdvs7354DQl87gvg+s6IxCL/h3k/wPCitqirfaqvbILTvP9r0PvtbcozSKntOin5pk8lKNeF7U4DoqYHy3dmB2Lz6JFD+uQQQfhibDJaaLIVKmwoPQugV05vZcHywyFaJw0szB2EFQu8W+Gl4y/RKEIe35J1wJ6spregZCCtLPu+k/2VCW0yvNSrhZcWaQUMLOFO/wOQhFFpTIBDPmLw0NhkstcNxuUMQ/sBp4MenQOoX5vmRBUo/1mT8fFMEVZXvyWeOFf2R2TRCV6HQUzmAeMQUUdjLzlP4aVNkQYqBlO4A0AEQetKUQSDRg6j8awZNYQE1vM+USdU4ugGUvvQIYWdplzpV7Ex+u6wgJQQQetVvxSon1ZRWuJTtbLkQJLzZ9JUCWzaM7uzySizedYugg0wqONX2rIBhBpZV2lc/iAdxkO2lGtLIUS5a8am7jEjuRI5nMUfpFbEMNNZTpY/0JN+pqMjpF+fcAAAAASUVORK5CYII=";
-const VIEWS_EYE_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAABU0lEQVR4nO1UsU7DQAyNhBiAgRHxHRR+pTOtupaP6IIUBXL2+XwnVIZ0y9ClCxRWBiZ+CTkhSO1dLmGJGGrJUhTb7/mefZckB/vX5u7dOYEda2Ag4BetzKd49V39s2PJ+TNwWZZHWpmJBv4g4K+YS47kSk0v8Dx/utDIqy5g2idCXkltXJIHd0lgNwGAR6PMVZZlJ+KIdqTB5n6e3QhGGNy5UwKz3i9CpNu2hgh46pOYtWB5yah4Eeo8qcmPCflOK34jMFsDbi7/KhJk5TWleLELjnYU0lVkkbgAejFw84ogp+tQrWD+Ehjg51BSc9S6c0+Kd4mlaXoWHDzaZW8CArMNrOerxIqi6CZok6g5ZkgiDaaSCIBvOiVqG7クスYjPkmkROsjvkn1seH3JsTQl42ramGnjWe02jFw1ZybZIobjIEuo8etEGeSoGeewGea4PNqh9A5YwaO8d5HQ0AAAAAElFTkSuQmCC";
 
 function getInitials(name) {
   if (!name) return "??";
@@ -41,15 +43,16 @@ export function VerificationBadge({ status }) {
       : "Этот пользователь подтвердил документы и является собственником жилья";
 
   return (
-      <View
-          style={[styles.badgeBase, isTrusted ? styles.badgeTrusted : styles.badgeOwner]}
+      <TouchableOpacity
+          style={styles.badgeBase}
           accessibilityLabel={title}
+          onPress={() => Alert.alert(isTrusted ? "Надежный партнер" : "Подтвержденный собственник", title)}
       >
         <Image
             source={{ uri: isTrusted ? TRUSTED_PARTNER_BADGE_ICON : OWNER_VERIFIED_BADGE_ICON }}
             style={styles.badgeIcon}
         />
-      </View>
+      </TouchableOpacity>
   );
 }
 
@@ -66,16 +69,25 @@ function OwnerAvatar({ name, avatarUrl }) {
   );
 }
 
-export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading, showFavoriteButton = true, footer = null, statusBadge = null, mutedMessage = "", disabledOpen = false, className = "" }) {
+export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading, showFavoriteButton = true, footer = null, statusBadge = null, mutedMessage = "", disabledOpen = false, mediaMuted = false, className = "" }) {
   const [index, setIndex] = useState(0);
   const photos = (ad.photoUrls?.length ? ad.photoUrls : ad.photos?.length ? ad.photos : [fallbackImage(ad.propertyType)]).map(assetUrl);
   const currentPhoto = photos[index];
   const isFallbackPhoto = currentPhoto?.startsWith("data:image/svg");
 
   return (
-      <View style={[styles.card, mutedMessage ? styles.cardMuted : null]}>
+      <View style={styles.card}>
         {/* Слайдер изображений карточки */}
-        <View style={styles.mediaContainer}>
+        <View style={[styles.mediaContainer, mediaMuted ? styles.mediaMuted : null]}>
+          {React.isValidElement(statusBadge) ? (
+              <View style={styles.mediaStatusBadge}>
+                {statusBadge}
+              </View>
+          ) : statusBadge?.label ? (
+              <View style={[styles.mediaStatusBadge, styles.statusBadge, statusBadge.style]}>
+                <Text style={styles.statusBadgeText}>{statusBadge.label}</Text>
+              </View>
+          ) : null}
           <TouchableOpacity
               activeOpacity={0.8}
               style={styles.coverButton}
@@ -132,11 +144,6 @@ export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading,
             </TouchableOpacity>
 
             <View style={styles.headerActions}>
-              {React.isValidElement(statusBadge) ? statusBadge : statusBadge?.label ? (
-                  <View style={[styles.statusBadge, statusBadge.style]}>
-                    <Text style={styles.statusBadgeText}>{statusBadge.label}</Text>
-                  </View>
-              ) : null}
               {showFavoriteButton && (
                   <TouchableOpacity
                       style={styles.favoriteButton}
@@ -169,8 +176,10 @@ export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading,
 
 export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loading, onOpenDialog, onOpenOwnerProfile, hideActions = false, duplicateWarning = null, footer = null }) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [fullScreenPhotoIndex, setFullScreenPhotoIndex] = useState(null);
   const photos = (ad?.photoUrls?.length ? ad.photoUrls : [fallbackImage(ad?.propertyType || "apartment")]).map(assetUrl);
   const currentPhoto = photos[currentPhotoIndex];
+  const fullScreenPhoto = fullScreenPhotoIndex == null ? null : photos[fullScreenPhotoIndex];
   const isFallbackPhoto = currentPhoto?.startsWith("data:image/svg");
 
   return (
@@ -192,7 +201,9 @@ export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loadin
                   <Text style={styles.coverFallbackText}>{propertyLabel(ad?.propertyType)}</Text>
                 </View>
             ) : (
-                <Image source={{ uri: currentPhoto }} style={styles.detailsMainImage} />
+                <TouchableOpacity style={styles.detailsMainImageButton} onPress={() => setFullScreenPhotoIndex(currentPhotoIndex)}>
+                  <Image source={{ uri: currentPhoto }} style={styles.detailsMainImage} />
+                </TouchableOpacity>
             )}
 
             {photos.length > 1 && (
@@ -246,7 +257,7 @@ export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loadin
                   <TouchableOpacity style={styles.ownerPrimaryBtn} onPress={() => { onOpenDialog(ad); onClose(); }}>
                     <Text style={styles.ownerPrimaryBtnText}>Написать</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.ownerSecondaryBtn} onPress={() => onOpenOwnerProfile?.(ad?.ownerId)}>
+                  <TouchableOpacity style={styles.ownerSecondaryBtn} onPress={() => { onOpenOwnerProfile?.(ad?.ownerId); onClose(); }}>
                     <Text style={styles.ownerSecondaryBtnText}>Профиль</Text>
                   </TouchableOpacity>
                 </View>
@@ -270,7 +281,7 @@ export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loadin
             </Text>
             <View style={styles.sideToolsRow}>
               <View style={styles.viewsContainer}>
-                <Image source={{ uri: VIEWS_EYE_ICON }} style={styles.viewsIcon} />
+                <Image source={EYE_ICON} style={styles.viewsIcon} />
                 <Text style={styles.viewsCountText}>{ad?.viewsCount || 0}</Text>
               </View>
               {!hideActions && (
@@ -293,6 +304,33 @@ export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loadin
           {duplicateWarning}
           {footer && <View style={styles.modalFooter}>{footer}</View>}
         </ScrollView>
+        <NativeModal visible={fullScreenPhotoIndex != null} transparent animationType="fade" onRequestClose={() => setFullScreenPhotoIndex(null)}>
+          <View style={styles.fullscreenPhotoBackdrop}>
+            <TouchableOpacity style={styles.fullscreenClose} onPress={() => setFullScreenPhotoIndex(null)}>
+              <Text style={styles.fullscreenCloseText}>×</Text>
+            </TouchableOpacity>
+            {!!fullScreenPhoto && <Image source={{ uri: fullScreenPhoto }} style={styles.fullscreenPhoto} />}
+            {photos.length > 1 && (
+              <>
+                <TouchableOpacity
+                  style={[styles.fullscreenArrow, styles.fullscreenArrowLeft]}
+                  onPress={() => setFullScreenPhotoIndex((p) => (p - 1 + photos.length) % photos.length)}
+                >
+                  <Text style={styles.fullscreenArrowText}>‹</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.fullscreenArrow, styles.fullscreenArrowRight]}
+                  onPress={() => setFullScreenPhotoIndex((p) => (p + 1) % photos.length)}
+                >
+                  <Text style={styles.fullscreenArrowText}>›</Text>
+                </TouchableOpacity>
+                <View style={styles.fullscreenCounter}>
+                  <Text style={styles.fullscreenCounterText}>{fullScreenPhotoIndex + 1} / {photos.length}</Text>
+                </View>
+              </>
+            )}
+          </View>
+        </NativeModal>
       </Modal>
   );
 }
@@ -300,14 +338,12 @@ export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loadin
 const styles = StyleSheet.create({
   // Общие стили и бэджи
   badgeBase: {
-    padding: 4,
+    padding: 0,
     borderRadius: 12,
     marginLeft: 6,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  badgeOwner: { backgroundColor: '#E3F2FD' },
-  badgeTrusted: { backgroundColor: '#E8F5E9' },
   badgeIcon: { width: 16, height: 16 },
 
   // Стили Аватара
@@ -338,8 +374,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  cardMuted: { opacity: 0.6 },
   mediaContainer: { height: 200, width: '100%', position: 'relative' },
+  mediaStatusBadge: { position: 'absolute', top: 10, left: 10, zIndex: 15 },
+  mediaMuted: { opacity: 0.45 },
   coverButton: { width: '100%', height: '100%' },
   coverImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   coverFallback: {
@@ -401,13 +438,14 @@ const styles = StyleSheet.create({
   photoCounterBox: { position: 'absolute', top: 12, left: 12, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, zIndex: 12 },
   photoCounterText: { color: '#fff', fontSize: 12, fontWeight: '500' },
   detailsMainImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  detailsMainImageButton: { width: '100%', height: '100%' },
   detailsFallback: { width: '100%', height: '100%', backgroundColor: '#F4F5F8', alignItems: 'center', justifyContent: 'center' },
 
   ownerCard: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#eee', marginBottom: 16 },
   ownerIdentityRow: { flexDirection: 'row', alignItems: 'center' },
   ownerMetaColumn: { marginLeft: 12, flex: 1 },
-  ownerNameRow: { flexDirection: 'row', alignItems: 'center' },
-  ownerNameText: { fontSize: 15, fontWeight: '700', color: '#222' },
+  ownerNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' },
+  ownerNameText: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: '#222' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   starText: { color: '#FFD700', fontSize: 14, marginRight: 2 },
   ratingScoreText: { fontSize: 13, fontWeight: '600', color: '#444' },
@@ -427,5 +465,15 @@ const styles = StyleSheet.create({
   viewsCountText: { fontSize: 12, color: '#555', fontWeight: '500' },
   descriptionContainer: { backgroundColor: '#fcfcfc', padding: 12, borderRadius: 8 },
   descriptionText: { fontSize: 15, color: '#333', lineHeight: 22 },
-  modalFooter: { marginTop: 16, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 12 }
+  modalFooter: { marginTop: 16, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 12 },
+  fullscreenPhotoBackdrop: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  fullscreenPhoto: { width: '100%', height: '100%', resizeMode: 'contain' },
+  fullscreenClose: { position: 'absolute', top: 48, right: 20, zIndex: 5, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  fullscreenCloseText: { color: '#fff', fontSize: 30, lineHeight: 34 },
+  fullscreenArrow: { position: 'absolute', top: '48%', zIndex: 5, width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  fullscreenArrowLeft: { left: 16 },
+  fullscreenArrowRight: { right: 16 },
+  fullscreenArrowText: { color: '#fff', fontSize: 34, lineHeight: 38, fontWeight: '700' },
+  fullscreenCounter: { position: 'absolute', bottom: 44, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+  fullscreenCounterText: { color: '#fff', fontSize: 13, fontWeight: '600' }
 });

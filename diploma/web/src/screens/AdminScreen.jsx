@@ -354,12 +354,12 @@ export function AdminScreen(props) {
                             <tbody>
                             {pageRows.map((request) => (
                                 <tr key={request.id}>
-                                    <td>{request.id}</td>
-                                    <td><strong>{request.userName}</strong><div>{request.phoneNumber}</div></td>
-                                    <td>{formatVerificationType(request.verificationType)}</td>
-                                    <td>{formatVerificationStatus(request.status)}</td>
-                                    <td>{request.cadastralNumber || "-"}</td>
-                                    <td className="actions-cell">
+                                    <td data-label="ID">{request.id}</td>
+                                    <td data-label="Пользователь"><strong>{request.userName}</strong><div>{request.phoneNumber}</div></td>
+                                    <td data-label="Тип">{formatVerificationType(request.verificationType)}</td>
+                                    <td data-label="Статус">{formatVerificationStatus(request.status)}</td>
+                                    <td data-label="Кадастровый номер">{request.cadastralNumber || "-"}</td>
+                                    <td data-label="Действия" className="actions-cell">
                                         <button className="small-btn primary" type="button" onClick={() => setDecisionModal({ open: true, request, failureReason: "" })}>
                                             Рассмотреть
                                         </button>
@@ -404,13 +404,13 @@ export function AdminScreen(props) {
                                 const canRevokeVerification = (user.role || "").toLowerCase() === "landlord";
                                 return (
                                     <tr key={user.id}>
-                                        <td>{user.id}</td>
-                                        <td>{user.fullName}{isCurrentUser ? " (вы)" : ""}</td>
-                                        <td>{user.phoneNumber}</td>
-                                        <td>{roleLabel(user.role)}</td>
-                                        <td>{formatUserVerificationStatus(user.verificationStatus, user.verified)}</td>
-                                        <td>{user.blocked ? "Заблокирован" : "Активен"}</td>
-                                        <td className="actions-cell">
+                                        <td data-label="ID">{user.id}</td>
+                                        <td data-label="ФИО">{user.fullName}{isCurrentUser ? " (вы)" : ""}</td>
+                                        <td data-label="Телефон">{user.phoneNumber}</td>
+                                        <td data-label="Роль">{roleLabel(user.role)}</td>
+                                        <td data-label="Верификация">{formatUserVerificationStatus(user.verificationStatus, user.verified)}</td>
+                                        <td data-label="Статус">{user.blocked ? "Заблокирован" : "Активен"}</td>
+                                        <td data-label="Действия" className="actions-cell">
                                             <button className="small-btn secondary" type="button" onClick={() => openVerificationModal(user)} disabled={user.blocked || (user.verified && !canRevokeVerification)}>
                                                 {user.verified ? "Снять верификацию" : "Верифицировать"}
                                             </button>
@@ -464,13 +464,13 @@ export function AdminScreen(props) {
                                 const isOwnAd = ad.ownerId === profile?.id;
                                 return (
                                     <tr key={ad.id}>
-                                        <td>{index + 1 + tablePage * rowsPerPage}</td>
-                                        <td>{ad.title}</td>
-                                        <td>{ad.userFullName || "Неизвестно"}{isOwnAd ? " (ваше)" : ""}</td>
-                                        <td>{ad.city}</td>
-                                        <td>{ad.userPhone || "-"}</td>
-                                        <td>{formatMoney(ad.rentalType === "short_term" ? ad.pricePerDay : ad.pricePerMonth)}</td>
-                                        <td className="actions-cell">
+                                        <td data-label="№">{index + 1 + tablePage * rowsPerPage}</td>
+                                        <td data-label="Название">{ad.title}</td>
+                                        <td data-label="Владелец">{ad.userFullName || "Неизвестно"}{isOwnAd ? " (ваше)" : ""}</td>
+                                        <td data-label="Город">{ad.city}</td>
+                                        <td data-label="Телефон">{ad.userPhone || "-"}</td>
+                                        <td data-label="Цена">{formatMoney(ad.rentalType === "short_term" ? ad.pricePerDay : ad.pricePerMonth)}</td>
+                                        <td data-label="Действия" className="actions-cell">
                                             <button
                                                 className="small-btn primary"
                                                 type="button"

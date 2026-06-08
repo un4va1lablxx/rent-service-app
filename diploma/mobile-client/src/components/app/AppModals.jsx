@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 // Импортируем базовые нативные компоненты интерфейса
 import {
+    ActivityIndicator,
+    Image,
+    Keyboard,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -8,7 +12,9 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import DatePicker from "react-native-date-picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { assetUrl } from "../../lib/api";
+import { formatDisplayDate } from "../../shared/formatters";
 
 function parseDateTime(dateValue, timeValue = "12:00") {
     const today = new Date();
@@ -255,7 +261,22 @@ export function AppModals(props) {
     const [sellerAdsFilter, setSellerAdsFilter] = useState("active");
 
     const sellerAds = sellerProfileModal.data?.ads || [];
+    const [sellerReviewsPage, setSellerReviewsPage] = useState(0);
+    const sellerReviews = sellerProfileModal.data?.reviews || [];
     const filteredSellerAds = useMemo(() => sellerAds.filter((item) => sellerAdsFilter === "active" ? item.active : !item.active), [sellerAds, sellerAdsFilter]);
+    const sellerDisplayedRating = useMemo(() => {
+        if (!sellerReviews.length) {
+            return {
+                rating: Number(sellerProfileModal.data?.landlordRating || 0),
+                count: Number(sellerProfileModal.data?.landlordReviewsCount || 0),
+            };
+        }
+        const total = sellerReviews.reduce((sum, review) => sum + Number(review.rating || 0), 0);
+        return {
+            rating: Math.round((total / sellerReviews.length) * 10) / 10,
+            count: sellerReviews.length,
+        };
+    }, [sellerProfileModal.data?.landlordRating, sellerProfileModal.data?.landlordReviewsCount, sellerReviews]);
 
     const withRubles = (value) => {
         const normalized = String(value || "").trim();
@@ -263,8 +284,6 @@ export function AppModals(props) {
         return /руб\.?$/i.test(normalized) ? normalized : `${normalized} руб.`;
     };
 
-    const [sellerReviewsPage, setSellerReviewsPage] = useState(0);
-    const sellerReviews = sellerProfileModal.data?.reviews || [];
     const sellerReviewsPagesCount = Math.max(1, Math.ceil(sellerReviews.length / 3));
     const pagedSellerReviews = sellerReviews.slice(sellerReviewsPage * 3, (sellerReviewsPage + 1) * 3);
 
@@ -288,6 +307,14 @@ export function AppModals(props) {
             time: viewingPicker.mode === "time" ? formatTimeValue(date) : prev.time,
         }));
         setViewingPicker((prev) => ({ ...prev, open: false, date }));
+    };
+
+    const handleViewingPickerChange = (event, selectedDate) => {
+        if (Platform.OS === "android") {
+            setViewingPicker((prev) => ({ ...prev, open: false }));
+        }
+        if (event?.type === "dismissed" || !selectedDate) return;
+        confirmViewingPicker(selectedDate);
     };
 
     return (
@@ -348,9 +375,134 @@ export function AppModals(props) {
             )}
 
             {/* 2. Модалка блокировки пользователя */}
+            {sellerProfileModal?.open && (
+                <Modal onClose={() => setSellerProfileModal({ open: false, data: null, loading: false })} wide>
+                    <ScrollView contentContainerStyle={styles.sellerProfileModal} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+                        {sellerProfileModal.loading ? (
+                            <View style={styles.sellerLoading}>
+                                <ActivityIndicator size="large" color="#007AFF" />
+                                <Text style={styles.modalText}>Загрузка профиля...</Text>
+                            </View>
+                        ) : (
+                            <>
+                                <View style={styles.sellerProfileHead}>
+                                    <View style={[styles.sellerProfileAvatar, sellerProfileModal.data?.avatarUrl ? styles.sellerProfileAvatarPhoto : null]}>
+                                        {sellerProfileModal.data?.avatarUrl ? (
+                                            <Image source={{ uri: assetUrl(sellerProfileModal.data.avatarUrl) }} style={styles.sellerProfileAvatarImage} />
+                                        ) : (
+                                            <Text style={styles.sellerProfileAvatarText}>{(sellerProfileModal.data?.fullName || "П").charAt(0)}</Text>
+                                        )}
+                                    </View>
+                                    <View style={styles.sellerProfileMain}>
+                                        <Text style={styles.sellerProfileName} numberOfLines={2}>{sellerProfileModal.data?.fullName || "Пользователь"}</Text>
+                                        <View style={styles.sellerRatingRow}>
+                                            <Text style={styles.sellerRating}>★ {Number(sellerDisplayedRating.rating || 0).toFixed(1)}</Text>
+                                            <Text style={styles.sellerRatingMuted}>• {sellerDisplayedRating.count || 0} отзывов</Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={styles.primaryButton}
+                                    onPress={() => {
+                                        Keyboard.dismiss();
+                                        const firstAd = (sellerProfileModal.data?.ads || [])[0];
+                                        if (firstAd) {
+                                            openDialogFromAd({
+                                                ...firstAd,
+                                                ownerId: firstAd.ownerId || sellerProfileModal.data?.id,
+                                                ownerName: firstAd.ownerName || sellerProfileModal.data?.fullName,
+                                                ownerAvatarUrl: firstAd.ownerAvatarUrl || sellerProfileModal.data?.avatarUrl,
+                                            });
+                                            setSellerProfileModal({ open: false, data: null, loading: false });
+                                        } else {
+                                            setNotice("У продавца нет активных объявлений для переписки.");
+                                        }
+                                    }}
+                                >
+                                    <Text style={styles.primaryButtonText}>Написать</Text>
+                                </TouchableOpacity>
+
+                                <View style={styles.sellerProfileSection}>
+                                    <View style={styles.sellerSectionHeading}>
+                                        <Text style={styles.sellerSectionTitle}>Отзывы</Text>
+                                        {sellerReviews.length > 3 && (
+                                            <View style={styles.sellerReviewPagination}>
+                                                <TouchableOpacity style={styles.sellerReviewArrow} onPress={() => setSellerReviewsPage((current) => Math.max(0, current - 1))} disabled={sellerReviewsPage === 0}>
+                                                    <Text style={styles.sellerReviewArrowText}>‹</Text>
+                                                </TouchableOpacity>
+                                                <Text style={styles.sellerPageText}>{sellerReviewsPage + 1} из {sellerReviewsPagesCount}</Text>
+                                                <TouchableOpacity style={styles.sellerReviewArrow} onPress={() => setSellerReviewsPage((current) => Math.min(sellerReviewsPagesCount - 1, current + 1))} disabled={sellerReviewsPage >= sellerReviewsPagesCount - 1}>
+                                                    <Text style={styles.sellerReviewArrowText}>›</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+                                    </View>
+                                    {pagedSellerReviews.map((review) => (
+                                        <View key={review.id} style={styles.reviewCard}>
+                                            <View style={styles.reviewCardTop}>
+                                                <View style={styles.reviewAuthorBlock}>
+                                                    <View style={styles.reviewAuthorAvatar}>
+                                                        {review.authorAvatarUrl ? (
+                                                            <Image source={{ uri: assetUrl(review.authorAvatarUrl) }} style={styles.reviewAuthorAvatarImage} />
+                                                        ) : (
+                                                            <Text style={styles.reviewAuthorAvatarText}>{(review.authorName || "П").charAt(0)}</Text>
+                                                        )}
+                                                    </View>
+                                                    <Text style={styles.reviewAuthorName}>{review.authorName || "Пользователь"}</Text>
+                                                </View>
+                                                <Text style={styles.reviewRating}>★ {Number(review.rating || 0).toFixed(1)}</Text>
+                                            </View>
+                                            <Text style={styles.reviewComment}>{review.comment || "Без комментария"}</Text>
+                                            <Text style={styles.reviewAdTitle}>{review.adTitle || "Объявление"}</Text>
+                                        </View>
+                                    ))}
+                                    {!sellerReviews.length && <Text style={styles.emptyInline}>Пока нет отзывов.</Text>}
+                                </View>
+
+                                <View style={styles.sellerProfileSection}>
+                                    <View style={styles.sellerAdsHeadingRow}>
+                                        <Text style={styles.sellerSectionTitle}>Объявления</Text>
+                                        <Text style={styles.sellerCount}>{filteredSellerAds.length}</Text>
+                                    </View>
+                                    <View style={styles.segmentedContainer}>
+                                        <TouchableOpacity style={[styles.segmentButton, sellerAdsFilter === "active" && styles.segmentActive]} onPress={() => setSellerAdsFilter("active")}>
+                                            <Text style={[styles.segmentText, sellerAdsFilter === "active" && styles.segmentTextActive]}>Активные</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={[styles.segmentButton, sellerAdsFilter === "archive" && styles.segmentActive]} onPress={() => setSellerAdsFilter("archive")}>
+                                            <Text style={[styles.segmentText, sellerAdsFilter === "archive" && styles.segmentTextActive]}>В архиве</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    {filteredSellerAds.map((item) => {
+                                        const isArchive = sellerAdsFilter === "archive" || !item.active;
+                                        return (
+                                            <ListingCard
+                                                key={item.id}
+                                                ad={item}
+                                                onOpen={(id) => {
+                                                    setSelectedAdId(id);
+                                                    setSellerProfileModal({ open: false, data: null, loading: false });
+                                                }}
+                                                onToggleFavorite={handleToggleFavorite}
+                                                isFavorite={favoriteIds.has(item.id) || favoriteStatusMap[item.id]}
+                                                loading={loadingMap[`favorite-${item.id}`]}
+                                                disabledOpen={isArchive}
+                                                mediaMuted={isArchive}
+                                                mutedMessage={isArchive ? "Объявление снято с публикации" : ""}
+                                            />
+                                        );
+                                    })}
+                                    {!filteredSellerAds.length && <Text style={styles.emptyInline}>Объявлений в этом разделе пока нет.</Text>}
+                                </View>
+                            </>
+                        )}
+                    </ScrollView>
+                </Modal>
+            )}
+
             {blockModal.open && (
                 <Modal onClose={() => setBlockModal({ open: false, user: null })}>
-                    <ScrollView contentContainerStyle={styles.modalContent}>
+                    <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
                         <View style={styles.headerRow}>
                             <Text style={styles.eyebrow}>Пользователь</Text>
                             <Text style={styles.modalTitle}>
@@ -397,7 +549,7 @@ export function AppModals(props) {
             {/* 3. Модалка верификации пользователя */}
             {verificationModal.open && (
                 <Modal onClose={() => setVerificationModal({ open: false, user: null })}>
-                    <ScrollView contentContainerStyle={styles.modalContent}>
+                    <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
                         <View style={styles.headerRow}>
                             <Text style={styles.eyebrow}>Проверка профиля</Text>
                             <Text style={styles.modalTitle}>
@@ -585,7 +737,7 @@ export function AppModals(props) {
             {/* 6. Модалка Черновика / Создания объявления */}
             {draftModal.open && (
                 <Modal onClose={closeDraftModal} wide>
-                    <ScrollView contentContainerStyle={styles.scrollForm}>
+                    <ScrollView contentContainerStyle={styles.scrollForm} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
                         <View style={styles.titleActionRow}>
                             <Text style={styles.formTitle}>
                                 {draftModal.ad ? "Редактирование объявления" : "Новое объявление"}
@@ -602,7 +754,7 @@ export function AppModals(props) {
                         </View>
 
                         <View style={styles.formGrid}>
-                            <Field label="Название">
+                            <Field label="Название" wide>
                                 <TextInput style={styles.formInput} value={draft.title} onChangeText={(val) => setDraft({ ...draft, title: val })} />
                             </Field>
 
@@ -710,24 +862,12 @@ export function AppModals(props) {
             {viewingModal.open && (
                 <Modal onClose={() => setViewingModal({ open: false, date: "", time: "" })}>
                     <View style={styles.modalContent}>
-                        <DatePicker
-                            modal
-                            open={viewingPicker.open}
-                            date={viewingPicker.date}
-                            mode={viewingPicker.mode}
-                            locale="ru"
-                            title={viewingPicker.mode === "date" ? "Дата просмотра" : "Время просмотра"}
-                            confirmText="Готово"
-                            cancelText="Отмена"
-                            onConfirm={confirmViewingPicker}
-                            onCancel={() => setViewingPicker((prev) => ({ ...prev, open: false }))}
-                        />
                         <Text style={styles.modalTitle}>Предложить просмотр</Text>
 
                         <Text style={styles.fieldLabelText}>Дата просмотра</Text>
                         <TouchableOpacity style={styles.pickerButton} onPress={() => openViewingPicker("date")}>
                             <Text style={[styles.pickerButtonText, !viewingModal.date && styles.pickerPlaceholder]}>
-                                {viewingModal.date || "Выбрать дату"}
+                                {viewingModal.date ? formatDisplayDate(viewingModal.date) : "Выбрать дату"}
                             </Text>
                         </TouchableOpacity>
 
@@ -738,11 +878,22 @@ export function AppModals(props) {
                             </Text>
                         </TouchableOpacity>
 
+                        {viewingPicker.open && (
+                            <DateTimePicker
+                                value={viewingPicker.date}
+                                mode={viewingPicker.mode}
+                                display={Platform.OS === "ios" ? "spinner" : viewingPicker.mode === "date" ? "calendar" : "clock"}
+                                locale="ru-RU"
+                                minuteInterval={5}
+                                onChange={handleViewingPickerChange}
+                            />
+                        )}
+
                         <View style={styles.modalActions}>
-                            <TouchableOpacity style={styles.secondaryButton} onPress={() => setViewingModal({ open: false, date: "", time: "" })}>
+                            <TouchableOpacity style={styles.secondaryButton} onPress={() => { Keyboard.dismiss(); setViewingModal({ open: false, date: "", time: "" }); }}>
                                 <Text style={styles.secondaryButtonText}>Отмена</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.primaryButton} onPress={handleProposeViewing}>
+                            <TouchableOpacity style={styles.primaryButton} onPress={() => { Keyboard.dismiss(); handleProposeViewing(); }}>
                                 <Text style={styles.primaryButtonText}>Предложить</Text>
                             </TouchableOpacity>
                         </View>
@@ -772,6 +923,183 @@ const styles = StyleSheet.create({
         color: '#444',
         marginBottom: 12,
         lineHeight: 20,
+    },
+    sellerProfileModal: {
+        paddingBottom: 32,
+        gap: 18,
+    },
+    sellerLoading: {
+        minHeight: 220,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 12,
+    },
+    sellerProfileHead: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 14,
+        marginBottom: 4,
+    },
+    sellerProfileAvatar: {
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        backgroundColor: "#007AFF",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+    },
+    sellerProfileAvatarPhoto: {
+        backgroundColor: "transparent",
+    },
+    sellerProfileAvatarImage: {
+        width: 68,
+        height: 68,
+        resizeMode: "cover",
+    },
+    sellerProfileAvatarText: {
+        color: "#fff",
+        fontSize: 28,
+        fontWeight: "800",
+    },
+    sellerProfileMain: {
+        flex: 1,
+    },
+    sellerProfileName: {
+        color: "#111",
+        fontSize: 22,
+        fontWeight: "800",
+        flexShrink: 1,
+    },
+    sellerRatingRow: {
+        flexDirection: "row",
+        gap: 8,
+        marginTop: 6,
+        alignItems: "center",
+    },
+    sellerRating: {
+        color: "#FFA000",
+        fontWeight: "700",
+    },
+    sellerRatingMuted: {
+        color: "#8E8E93",
+        fontWeight: "600",
+    },
+    sellerProfileSection: {
+        gap: 10,
+        borderTopWidth: 1,
+        borderTopColor: "#E5E5EA",
+        paddingTop: 16,
+    },
+    sellerSectionHeading: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    sellerSectionTitle: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: "#111",
+    },
+    sellerAdsHeadingRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
+    sellerReviewPagination: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    sellerReviewArrow: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#F2F2F7",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    sellerReviewArrowText: {
+        fontSize: 22,
+        color: "#007AFF",
+        fontWeight: "800",
+    },
+    sellerPageText: {
+        color: "#8E8E93",
+        fontWeight: "700",
+    },
+    reviewCard: {
+        backgroundColor: "#F8F8FA",
+        borderRadius: 12,
+        padding: 12,
+        gap: 8,
+    },
+    reviewCardTop: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    reviewAuthorBlock: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        flex: 1,
+    },
+    reviewAuthorAvatar: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: "#DDEBFF",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+    },
+    reviewAuthorAvatarImage: {
+        width: 34,
+        height: 34,
+    },
+    reviewAuthorAvatarText: {
+        color: "#007AFF",
+        fontWeight: "800",
+    },
+    reviewAuthorName: {
+        color: "#111",
+        fontWeight: "800",
+        flex: 1,
+    },
+    reviewRating: {
+        color: "#FFA000",
+        fontWeight: "800",
+    },
+    reviewComment: {
+        color: "#3A3A3C",
+        lineHeight: 20,
+    },
+    reviewAdTitle: {
+        color: "#8E8E93",
+        fontSize: 12,
+        fontWeight: "700",
+    },
+    sellerCount: {
+        color: "#007AFF",
+        fontSize: 22,
+        fontWeight: "900",
+        marginLeft: 4,
+    },
+    sellerAdLink: {
+        backgroundColor: "#F2F2F7",
+        borderRadius: 10,
+        padding: 12,
+    },
+    sellerAdLinkText: {
+        color: "#007AFF",
+        fontWeight: "700",
+        lineHeight: 20,
+    },
+    emptyInline: {
+        color: "#8E8E93",
+        paddingVertical: 10,
+        fontWeight: "600",
     },
     eyebrow: {
         fontSize: 12,
@@ -1037,13 +1365,15 @@ const styles = StyleSheet.create({
         paddingTop: 8,
     },
     scrollForm: {
-        padding: 16,
+        paddingHorizontal: 10,
+        paddingTop: 6,
+        paddingBottom: 18,
     },
     titleActionRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 10,
     },
     formTitle: {
         fontSize: 22,
@@ -1052,9 +1382,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     saveFormButton: {
-        backgroundColor: '#34C759',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 14,
+        paddingVertical: 9,
         borderRadius: 8,
     },
     saveFormButtonText: {
@@ -1063,24 +1393,30 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     formGrid: {
-        gap: 14,
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+        justifyContent: "space-between",
     },
     formInput: {
         borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 6,
-        padding: 10,
+        borderColor: '#D8D8DE',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
         fontSize: 15,
         backgroundColor: '#fff',
+        minHeight: 40,
     },
     formTextarea: {
         borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 6,
-        padding: 10,
+        borderColor: '#D8D8DE',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
         fontSize: 15,
         backgroundColor: '#fff',
-        minHeight: 120,
+        minHeight: 86,
         textAlignVertical: 'top',
     },
     segmentedScroll: {

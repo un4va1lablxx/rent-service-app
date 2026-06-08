@@ -52,7 +52,7 @@ export function FavoritesScreen({
         const isUnavailable = !item.ad.active || item.ad.moderationStatus !== "approved";
 
         return (
-            <View style={[styles.cardWrapper, isUnavailable && styles.cardMuted]}>
+            <View style={styles.cardWrapper}>
                 <ListingCard
                     ad={item.ad}
                     onOpen={setSelectedAdId}
@@ -61,8 +61,9 @@ export function FavoritesScreen({
                     loading={loadingMap[`favorite-${item.adId}`]}
                     mutedMessage={isUnavailable ? "Объявление снято с публикации" : ""}
                     disabledOpen={isUnavailable}
+                    mediaMuted={isUnavailable}
                 />
-                {isUnavailable && (
+                {false && isUnavailable && (
                     <View style={styles.unavailableOverlay}>
                         <View style={styles.unavailableBadge}>
                             <Text style={styles.unavailableBadgeText}>Неактивно</Text>
@@ -98,7 +99,7 @@ export function FavoritesScreen({
     );
 
     return (
-        <View style={[styles.container, { paddingTop: Math.max(insets.top, 16) }]}>
+        <View style={styles.container}>
             {/* Заголовок экрана */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Избранное</Text>
@@ -115,7 +116,7 @@ export function FavoritesScreen({
                 contentContainerStyle={[
                     styles.listContent,
                     visibleFavorites.length === 0 && styles.listEmptyContent,
-                    { paddingBottom: Math.max(insets.bottom, 16) + 70 } // Учитываем высоту нижнего таббара
+                    { paddingBottom: Math.max(insets.bottom, 16) + 128 }
                 ]}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={renderEmptyState}
@@ -144,7 +145,8 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingTop: 0,
+        paddingBottom: 4,
         gap: 8,
     },
     headerTitle: {
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingHorizontal: 16,
-        paddingTop: 8,
+        paddingTop: 0,
     },
     listEmptyContent: {
         flex: 1,
@@ -177,9 +179,6 @@ const styles = StyleSheet.create({
         width: "100%",
         marginBottom: 16,
         position: "relative",
-        borderRadius: 16,
-        backgroundColor: "#FFFFFF",
-        overflow: "hidden",
     },
     cardMuted: {
         opacity: 0.65, // Смягчаем визуальный приоритет неактивного объявления

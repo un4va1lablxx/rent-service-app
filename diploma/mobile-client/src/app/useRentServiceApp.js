@@ -765,7 +765,7 @@ export function useRentServiceApp() {
             setError("");
             if (authMode === "register") {
                 const response = await authApi.startTelegramRegister({
-                    phoneNumber: phoneNumber.trim(),
+                    phoneNumber: phoneNumber.trim() === "+7" ? "" : phoneNumber.trim(),
                     fullName: fullName.trim(),
                     password: password.trim()
                 });
@@ -803,8 +803,9 @@ export function useRentServiceApp() {
             setBusy("telegram-auth", true);
             setError("");
             setNotice("");
+            const normalizedPhone = phoneNumber.trim() === "+7" ? "" : phoneNumber.trim();
             const payload = {
-                phoneNumber: phoneNumber.trim(),
+                phoneNumber: normalizedPhone,
                 fullName: fullName.trim(),
                 password: password.trim()
             };
@@ -812,6 +813,9 @@ export function useRentServiceApp() {
                 ? await authApi.startTelegramRegister(payload)
                 : await authApi.startTelegramLogin(payload);
             setTelegramAuth(response);
+            if (response?.botLink) {
+                await Linking.openURL(response.botLink);
+            }
         } catch (err) {
             setError(err.message);
         } finally {
@@ -1617,6 +1621,7 @@ export function useRentServiceApp() {
         chatRef,
         resetCodeRefs,
         handleResetCodeKeyPress,
+        handleResetCodeKeyDown: (index, event) => handleResetCodeKeyPress(index, event?.key || event?.nativeEvent?.key),
 
         bootstrapping,
         setBootstrapping,

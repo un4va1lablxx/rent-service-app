@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from "react";
 import {
     Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -77,6 +80,8 @@ export default function App() {
         visibleNavItems,
         selectedTab,
         setSelectedTab,
+        setActiveDialogKey,
+        activeDialogKey,
         unreadCount,
         notifications,
         notificationsUnread,
@@ -96,6 +101,8 @@ export default function App() {
 
     const [expandedNotificationId, setExpandedNotificationId] = useState(null);
     const [documentViewer, setDocumentViewer] = useState(null);
+    const showBottomTabs = selectedTab !== "messages" || !activeDialogKey;
+    const bottomTabsAsStaticFooter = selectedTab === "messages" && !activeDialogKey;
 
     // Форматирование имени пользователя для аватара
     const shortProfileName = useMemo(() => {
@@ -168,10 +175,11 @@ export default function App() {
 
     return (
         <SafeAreaProvider>
-            <SafeAreaView style={styles.appShell}>
+            <View style={styles.appShell}>
                 {/* ==========================================
                 ВЕРХНЯЯ ШАПКА ПРИЛОЖЕНИЯ (Topbar)
                 ========================================== */}
+                <SafeAreaView style={styles.topbarSafe} edges={["top"]} pointerEvents="box-none">
                 <View style={[styles.topbar, styles.glass]}>
                     <View style={styles.brandLockup}>
                         <Image source={require("./assets/logo.png")} style={styles.logo} />
@@ -182,7 +190,10 @@ export default function App() {
                         {/* Кнопка Уведомлений */}
                         <TouchableOpacity
                             style={styles.iconButton}
-                            onPress={() => setNotificationsOpen(!notificationsOpen)}
+                            onPress={() => {
+                                Keyboard.dismiss();
+                                setNotificationsOpen(!notificationsOpen);
+                            }}
                         >
                             <Bell size={22} color="#1C1C1E" strokeWidth={2.1} />
                             {notificationsUnread > 0 && (
@@ -202,28 +213,38 @@ export default function App() {
                         </View>
 
                         {/* Кнопка Выхода */}
-                        <TouchableOpacity style={styles.iconButton} onPress={handleLogout}>
+                        <TouchableOpacity style={styles.iconButton} onPress={() => { Keyboard.dismiss(); handleLogout(); }}>
                             <LogOut size={23} color="#1C1C1E" strokeWidth={2.1} />
                         </TouchableOpacity>
                     </View>
                 </View>
+                </SafeAreaView>
 
                 {/* ==========================================
                 ОСНОВНОЙ КОНТЕНТ (Активный экран)
                 ========================================== */}
-                <View style={styles.mainPage}>
-                    {selectedTab === "discover" && <DiscoverScreen {...appViewProps} />}
-                    {selectedTab === "favorites" && <FavoritesScreen {...appViewProps} />}
-                    {selectedTab === "messages" && <MessagesScreen {...appViewProps} />}
-                    {selectedTab === "manage" && isLandlord && <ManageScreen {...appViewProps} />}
-                    {selectedTab === "profile" && <ProfileScreen {...appViewProps} />}
-                    {selectedTab === "admin" && isAdmin && <AdminScreen {...appViewProps} />}
-                </View>
+                <SafeAreaView style={styles.contentSafe} edges={["top"]}>
+                    <KeyboardAvoidingView
+                        style={[
+                            styles.mainPage,
+                            bottomTabsAsStaticFooter ? styles.mainPageStaticFooter : showBottomTabs ? styles.mainPageWithTabs : styles.mainPageMessages,
+                        ]}
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                        keyboardVerticalOffset={Platform.OS === "ios" ? 16 : 0}
+                    >
+                        {selectedTab === "discover" && <DiscoverScreen {...appViewProps} />}
+                        {selectedTab === "favorites" && <FavoritesScreen {...appViewProps} />}
+                        {selectedTab === "messages" && <MessagesScreen {...appViewProps} />}
+                        {selectedTab === "manage" && isLandlord && <ManageScreen {...appViewProps} />}
+                        {selectedTab === "profile" && <ProfileScreen {...appViewProps} />}
+                        {selectedTab === "admin" && isAdmin && <AdminScreen {...appViewProps} />}
+                    </KeyboardAvoidingView>
+                </SafeAreaView>
 
                 {/* ==========================================
                 НИЖНИЙ НАВИГАЦИОННЫЙ БАР (Bottom Tab Bar)
                 ========================================== */}
-                <View style={[styles.bottomTabBar, styles.glass]}>
+                {showBottomTabs && <SafeAreaView style={bottomTabsAsStaticFooter ? styles.bottomTabSafeStatic : styles.bottomTabSafe} edges={["bottom"]} pointerEvents="box-none"><View style={[styles.bottomTabBar, styles.glass]}>
                     {visibleNavItems.map((item) => {
                         const TabIcon = tabIconMap[item.key] || Home;
                         const active = selectedTab === item.key; // ✅ Добавлена переменная active
@@ -232,7 +253,13 @@ export default function App() {
                             <TouchableOpacity
                                 key={item.key}
                                 style={styles.tabItem}
-                                onPress={() => setSelectedTab(item.key)}
+                                onPress={() => {
+                                    Keyboard.dismiss();
+                                    if (item.key === "messages") {
+                                        setActiveDialogKey(null);
+                                    }
+                                    setSelectedTab(item.key);
+                                }}
                                 accessibilityRole="button"
                                 accessibilityLabel={item.label}
                             >
@@ -251,7 +278,7 @@ export default function App() {
                             </TouchableOpacity>
                         );
                     })}
-                </View>
+                </View></SafeAreaView>}
 
                 {/* ==========================================
                 ШТОРКА УВЕДОМЛЕНИЙ (Full-screen Overlay)
@@ -326,7 +353,7 @@ export default function App() {
                 {/* Модальные окна глобального стейта */}
                 <AppModals {...appViewProps} />
                 <DocumentViewer document={documentViewer} onClose={() => setDocumentViewer(null)} />
-            </SafeAreaView>
+            </View>
         </SafeAreaProvider>
     );
 }
@@ -341,12 +368,19 @@ const styles = StyleSheet.create({
         backgroundColor: "#F2F2F7",
     },
     glass: {
-        backgroundColor: "#FFFFFF",
+        backgroundColor: "rgba(255, 255, 255, 0.88)",
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
         elevation: 4,
+    },
+    topbarSafe: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 30,
     },
     topbar: {
         height: 56,
@@ -354,8 +388,11 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center",
         paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: "#E5E5EA",
+        marginHorizontal: 18,
+        marginTop: 12,
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: "rgba(0, 0, 0, 0.08)",
     },
     brandLockup: {
         flexDirection: "row",
@@ -420,13 +457,33 @@ const styles = StyleSheet.create({
     },
     mainPage: {
         flex: 1,
-        paddingBottom: 84,
+        paddingTop: 84,
+    },
+    contentSafe: {
+        flex: 1,
+    },
+    mainPageWithTabs: {
+        paddingBottom: 98,
+    },
+    mainPageStaticFooter: {
+        paddingBottom: 0,
+    },
+    mainPageMessages: {
+        paddingBottom: 14,
+    },
+    bottomTabSafe: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 30,
+    },
+    bottomTabSafeStatic: {
+        zIndex: 30,
     },
     bottomTabBar: {
-        position: "absolute",
-        left: 18,
-        right: 18,
-        bottom: 12,
+        marginHorizontal: 18,
+        marginBottom: 12,
         height: 64,
         flexDirection: "row",
         borderWidth: 1,

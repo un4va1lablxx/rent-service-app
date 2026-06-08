@@ -206,6 +206,7 @@ export function AppModals(props) {
         Icon,
         DetailsModal,
         ListingCard,
+        VerificationBadge,
         renderChatMessage,
         formatMoney,
         formatPriceWithType,
@@ -233,6 +234,9 @@ export function AppModals(props) {
     const sellerReviews = sellerProfileModal.data?.reviews || [];
     const sellerReviewsPagesCount = Math.max(1, Math.ceil(sellerReviews.length / 3));
     const pagedSellerReviews = sellerReviews.slice(sellerReviewsPage * 3, (sellerReviewsPage + 1) * 3);
+    const sellerNameParts = (sellerProfileModal.data?.fullName || "Пользователь").trim().split(/\s+/).filter(Boolean);
+    const sellerNameFirstLine = sellerNameParts.length >= 3 ? sellerNameParts.slice(0, 2).join(" ") : sellerNameParts.join(" ");
+    const sellerNameTail = sellerNameParts.length >= 3 ? sellerNameParts.slice(2).join(" ") : "";
 
     useEffect(() => {
         setSellerReviewsPage(0);
@@ -854,7 +858,14 @@ export function AppModals(props) {
                                                 )}
                                             </div>
                                             <div className="seller-profile-main">
-                                                <h2>{sellerProfileModal.data?.fullName || "Пользователь"}</h2>
+                                                <h2 className="seller-profile-name">
+                                                    <span>{sellerNameFirstLine || "Пользователь"}</span>
+                                                    {" "}
+                                                    <span className="seller-profile-name-tail">
+                                                        {sellerNameTail && <span>{sellerNameTail}</span>}
+                                                        <VerificationBadge status={sellerProfileModal.data?.verificationStatus} />
+                                                    </span>
+                                                </h2>
                                                 <p>
                                                     <span className="seller-rating">★ {Number(sellerProfileModal.data?.landlordRating || 0).toFixed(1)}</span>
                                                     <span className="seller-rating-separator">•</span>

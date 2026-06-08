@@ -19,11 +19,16 @@ public interface AdRepository extends JpaRepository<Ad, Long> {
     Page<Ad> findByCityIgnoreCaseAndActiveTrueAndModerationStatus(String city, String moderationStatus, Pageable pageable);
     Page<Ad> findByActiveTrueAndModerationStatus(String moderationStatus, Pageable pageable);
     Page<Ad> findByModerationStatus(String moderationStatus, Pageable pageable);
+    Page<Ad> findByModerationStatusAndDeletedFalse(String moderationStatus, Pageable pageable);
+    Page<Ad> findByDeletedFalse(Pageable pageable);
     List<Ad> findByUserIdAndActiveTrueAndModerationStatusOrderByCreatedAtDesc(Long userId, String moderationStatus);
     List<Ad> findByUserIdAndModerationStatusAndDeletedFalseOrderByCreatedAtDesc(Long userId, String moderationStatus);
     long countByActiveTrueAndModerationStatus(String moderationStatus);
     long countByActiveTrue();
     long countByModerationStatus(String moderationStatus);
+    long countByDeletedFalse();
+    long countByActiveTrueAndDeletedFalse();
+    long countByModerationStatusAndDeletedFalse(String moderationStatus);
     @Query("SELECT a FROM Ad a WHERE a.moderationStatus = 'approved' AND a.active = true AND a.deleted = false") Page<Ad> findAllApproved(Pageable pageable);
 
     @Query("""

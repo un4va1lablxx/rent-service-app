@@ -87,6 +87,36 @@ export function Icon({ name, isActive = false, onAnimationEnd }) {
         );
     }
 
+    if (name === "message") {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                    d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+    }
+
+    if (name === "profile") {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                    d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+    }
+
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
             <path

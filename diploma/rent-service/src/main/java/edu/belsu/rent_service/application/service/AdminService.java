@@ -146,11 +146,11 @@ public class AdminService {
 
         if (status != null && !status.isBlank()) {
             String normalizedStatus = status.trim().toLowerCase();
-            return adRepository.findByModerationStatus(normalizedStatus, pageable)
+            return adRepository.findByModerationStatusAndDeletedFalse(normalizedStatus, pageable)
                     .map(adService::toSummary);
         }
 
-        return adRepository.findAll(pageable)
+        return adRepository.findByDeletedFalse(pageable)
                 .map(adService::toSummary);
     }
 
@@ -158,7 +158,7 @@ public class AdminService {
     public Page<AdSummaryResponse> getAdsForModeration(String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         String normalizedStatus = status == null || status.isBlank() ? "pending" : status.trim().toLowerCase();
-        return adRepository.findByModerationStatus(normalizedStatus, pageable)
+        return adRepository.findByModerationStatusAndDeletedFalse(normalizedStatus, pageable)
                 .map(adService::toSummary);
     }
 
@@ -210,10 +210,10 @@ public class AdminService {
     public AdminStatsResponse getStats() {
         return AdminStatsResponse.builder()
                 .usersCount(userRepository.count())
-                .adsCount(adRepository.count())
-                .activeAdsCount(adRepository.countByActiveTrue())
-                .pendingAdsCount(adRepository.countByModerationStatus("pending"))
-                .approvedAdsCount(adRepository.countByModerationStatus("approved"))
+                .adsCount(adRepository.countByDeletedFalse())
+                .activeAdsCount(adRepository.countByActiveTrueAndDeletedFalse())
+                .pendingAdsCount(adRepository.countByModerationStatusAndDeletedFalse("pending"))
+                .approvedAdsCount(adRepository.countByModerationStatusAndDeletedFalse("approved"))
                 .messagesCount(messageRepository.count())
                 .build();
     }

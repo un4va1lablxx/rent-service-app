@@ -424,7 +424,8 @@ export function useRentServiceApp() {
         openDialogFromAd({
             id: Number(chatAdId),
             ownerId: Number(sellerId),
-            title: params.get("adTitle") || "Объявление"
+            title: params.get("adTitle") || "Объявление",
+            ownerName: params.get("ownerName") || "Владелец"
         });
 
         const cleanUrl = `${window.location.origin}${window.location.pathname}`;
@@ -794,8 +795,9 @@ export function useRentServiceApp() {
             setBusy("telegram-auth", true);
             setError("");
             setNotice("");
+            const normalizedPhone = phoneNumber.trim() === "+7" ? "" : phoneNumber.trim();
             const payload = {
-                phoneNumber: phoneNumber.trim(),
+                phoneNumber: normalizedPhone,
                 fullName: fullName.trim(),
                 password: password.trim()
             };
@@ -803,6 +805,12 @@ export function useRentServiceApp() {
                 ? await authApi.startTelegramRegister(payload)
                 : await authApi.startTelegramLogin(payload);
             setTelegramAuth(response);
+            if (response?.botLink) {
+                const telegramWindow = window.open(response.botLink, "_blank");
+                if (!telegramWindow) {
+                    setNotice("Разрешите всплывающее окно или откройте Telegram по ссылке в блоке подтверждения.");
+                }
+            }
         } catch (err) {
             setError(err.message);
         } finally {

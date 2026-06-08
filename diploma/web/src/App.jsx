@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import ImageUploader from "./components/ImageUploader";
 import AddressInput from "./components/AddressInput.jsx";
 import {
@@ -17,7 +17,7 @@ import {
 } from "./lib/api";
 import { initialDraft, navItems, propertyOptions, roomOptions } from "./shared/appConstants";
 import { Field, Metric, Modal, Icon } from "./components/ui";
-import { DetailsModal, ListingCard } from "./components/listings/ListingComponents";
+import { DetailsModal, ListingCard, VerificationBadge } from "./components/listings/ListingComponents";
 import { renderChatMessage } from "./components/messages/chatRendering";
 import { fallbackImage, formatMoney, formatPriceWithType, propertyLabel, roleLabel, statusLabel } from "./shared/formatters";
 import {
@@ -63,18 +63,14 @@ export default function App() {
         setError
     } = appState;
 
-    const navScrollRef = useRef(null);
     const [expandedNotificationId, setExpandedNotificationId] = useState(null);
 
     const shortProfileName = useMemo(() => {
         if (!profile?.fullName) return "";
         const parts = profile.fullName.trim().split(/\s+/).filter(Boolean);
-        return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[1]?.charAt(0) || ""}.`.trim();
+        if (parts.length === 1) return parts[0];
+        return `${parts[1]} ${parts[0]?.charAt(0) || ""}.`.trim();
     }, [profile?.fullName]);
-
-    function scrollNav(direction) {
-        navScrollRef.current?.scrollBy({ left: direction * 180, behavior: "smooth" });
-    }
 
     const appViewProps = {
         ...appState,
@@ -102,6 +98,7 @@ export default function App() {
         Icon,
         DetailsModal,
         ListingCard,
+        VerificationBadge,
         renderChatMessage,
         formatMoney,
         formatPriceWithType,
@@ -115,6 +112,37 @@ export default function App() {
         normalizeInteger,
         normalizeNumber
     };
+
+    const notificationsPanel = notificationsOpen && (
+        <div className="notifications-dropdown notifications-dropdown-portal glass">
+            <div className="notifications-modal-head">
+                <h3>Уведомления</h3>
+                <div className="notifications-head-actions">
+                    <button className="ghost-button" type="button" onClick={clearNotifications}>Удалить все</button>
+                    <button className="ghost-button" type="button" onClick={() => setNotificationsOpen(false)}>Закрыть</button>
+                </div>
+            </div>
+            <div className="notifications-list">
+                {notifications.length ? notifications.map((item) => (
+                    <div key={item.id} className={`notification-item ${item.read ? "is-read" : "is-unread"}`}>
+                        <button
+                            className="notification-main"
+                            type="button"
+                            onClick={() => {
+                                setExpandedNotificationId((prev) => prev === item.id ? null : item.id);
+                                markNotificationRead(item.id);
+                            }}
+                        >
+                            <strong>Вы получили сообщение от администратора</strong>
+                            <small>{new Date(item.createdAt).toLocaleString("ru-RU")}</small>
+                            {expandedNotificationId === item.id && <p>{item.message}</p>}
+                        </button>
+                        <button className="notification-delete" type="button" onClick={() => removeNotification(item.id)}>Удалить</button>
+                    </div>
+                )) : <div className="empty-inline">Уведомлений пока нет.</div>}
+            </div>
+        </div>
+    );
 
     if (bootstrapping) return <BootScreen {...appViewProps} />;
     if (!profile) return <AuthScreen {...appViewProps} />;
@@ -138,8 +166,7 @@ export default function App() {
                     <div className="brand-name">Рент</div>
                 </div>
                 <div className="topbar-nav-shell">
-                    <button className="nav-scroll-button" type="button" onClick={() => scrollNav(-1)} title="Прокрутить влево">◀</button>
-                    <div className="topbar-nav-track" ref={navScrollRef}>
+                    <div className="topbar-nav-track">
                         <nav className="topbar-nav">
                             {visibleNavItems.map((item) => (
                                 <button key={item.key} className={selectedTab === item.key ? "active" : ""} type="button" onClick={() => setSelectedTab(item.key)}>
@@ -190,9 +217,10 @@ export default function App() {
                             )}
                         </div>
                     </div>
-                    <button className="nav-scroll-button" type="button" onClick={() => scrollNav(1)} title="Прокрутить вправо">▶</button>
                 </div>
             </header>
+
+            {notificationsPanel}
 
             <main className="page">
                 {selectedTab === "discover" && <DiscoverScreen {...appViewProps} />}

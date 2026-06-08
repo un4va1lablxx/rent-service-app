@@ -5,9 +5,12 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    Platform,
+    Keyboard
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { formatDisplayDate } from "../shared/formatters";
 
 function parseDate(value) {
     const [year, month, day] = String(value || "").split("-").map(Number);
@@ -37,10 +40,23 @@ export function DiscoverScreen(props) {
         setSelectedAdId
     } = props;
 
-    const [datePicker, setDatePicker] = useState({ open: false, field: "checkIn" });
+    const [datePicker, setDatePicker] = useState({ open: false, field: "checkIn", date: new Date() });
+
+    const openDatePicker = (field) => {
+        const currentValue = field === "checkIn" ? checkInDate : checkOutDate;
+        Keyboard.dismiss();
+        setDatePicker({ open: true, field, date: parseDate(currentValue) });
+    };
+
+    const applyDatePickerValue = (date) => {
+        const value = formatDate(date);
+        if (datePicker.field === "checkIn") setCheckInDate(value);
+        else setCheckOutDate(value);
+    };
 
     // Безопасный вызов веб-обработчика формы на мобильной платформе
     const triggerSearch = () => {
+        Keyboard.dismiss();
         if (handleSearchSubmit) {
             handleSearchSubmit({ preventDefault: () => {} });
         }
@@ -51,6 +67,7 @@ export function DiscoverScreen(props) {
             style={styles.discoverPage}
             contentContainerStyle={styles.scrollContainer}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
         >
             {/* ==========================================
           БЛОК 1: Фильтры (Вместо веб-сайдбара aside)
@@ -159,31 +176,53 @@ export function DiscoverScreen(props) {
                     <View style={styles.field}>
                         <Text style={styles.fieldLabel}>Даты проживания</Text>
                         <View style={styles.dateRangeContainer}>
-                            <TouchableOpacity style={styles.dateButton} onPress={() => setDatePicker({ open: true, field: "checkIn" })}>
+                            <TouchableOpacity style={styles.dateButton} onPress={() => openDatePicker("checkIn")}>
                                 <Text style={[styles.dateButtonText, !checkInDate && styles.dateButtonPlaceholder]}>
-                                    {checkInDate || "Заезд"}
+                                    {checkInDate ? formatDisplayDate(checkInDate) : "Заезд"}
                                 </Text>
                             </TouchableOpacity>
                             <Text style={styles.dateSeparator}>➔</Text>
-                            <TouchableOpacity style={styles.dateButton} onPress={() => setDatePicker({ open: true, field: "checkOut" })}>
+                            <TouchableOpacity style={styles.dateButton} onPress={() => openDatePicker("checkOut")}>
                                 <Text style={[styles.dateButtonText, !checkOutDate && styles.dateButtonPlaceholder]}>
-                                    {checkOutDate || "Выезд"}
+                                    {checkOutDate ? formatDisplayDate(checkOutDate) : "Выезд"}
                                 </Text>
                             </TouchableOpacity>
                         </View>
                         {datePicker.open && (
-                            <DateTimePicker
-                                value={parseDate(datePicker.field === "checkIn" ? checkInDate : checkOutDate)}
-                                mode="date"
-                                display="default"
-                                onChange={(event, selectedDate) => {
-                                    setDatePicker((prev) => ({ ...prev, open: false }));
-                                    if (event.type === "dismissed" || !selectedDate) return;
-                                    const value = formatDate(selectedDate);
-                                    if (datePicker.field === "checkIn") setCheckInDate(value);
-                                    else setCheckOutDate(value);
-                                }}
-                            />
+                            <View style={styles.datePickerPanel}>
+                                <DateTimePicker
+                                    value={datePicker.date}
+                                    mode="date"
+                                    display={Platform.OS === "ios" ? "spinner" : "calendar"}
+                                    locale="ru-RU"
+                                    onChange={(event, selectedDate) => {
+                                        if (event.type === "dismissed") {
+                                            setDatePicker((prev) => ({ ...prev, open: false }));
+                                            return;
+                                        }
+                                        if (!selectedDate) return;
+                                        if (Platform.OS === "android") {
+                                            applyDatePickerValue(selectedDate);
+                                            setDatePicker((prev) => ({ ...prev, open: false, date: selectedDate }));
+                                            return;
+                                        }
+                                        setDatePicker((prev) => ({ ...prev, date: selectedDate }));
+                                    }}
+                                />
+                                {Platform.OS === "ios" && (
+                                    <View style={styles.datePickerActions}>
+                                        <TouchableOpacity style={styles.datePickerAction} onPress={() => setDatePicker((prev) => ({ ...prev, open: false }))}>
+                                            <Text style={styles.datePickerActionText}>Отмена</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={[styles.datePickerAction, styles.datePickerActionPrimary]} onPress={() => {
+                                            applyDatePickerValue(datePicker.date);
+                                            setDatePicker((prev) => ({ ...prev, open: false }));
+                                        }}>
+                                            <Text style={styles.datePickerActionPrimaryText}>Готово</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
                         )}
                     </View>
                 )}
@@ -287,6 +326,7 @@ const styles = StyleSheet.create({
     },
     scrollContainer: {
         padding: 14,
+        paddingBottom: 128,
     },
     glass: {
         backgroundColor: "#FFFFFF",
@@ -406,6 +446,39 @@ const styles = StyleSheet.create({
     dateSeparator: {
         marginHorizontal: 8,
         color: "#8E8E93",
+    },
+    datePickerPanel: {
+        backgroundColor: "#FFFFFF",
+        borderRadius: 12,
+        marginTop: 10,
+        borderWidth: 1,
+        borderColor: "#E5E5EA",
+        overflow: "hidden",
+    },
+    datePickerActions: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        gap: 8,
+        padding: 8,
+        borderTopWidth: 1,
+        borderTopColor: "#E5E5EA",
+    },
+    datePickerAction: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: "#F2F2F7",
+    },
+    datePickerActionPrimary: {
+        backgroundColor: "#007AFF",
+    },
+    datePickerActionText: {
+        color: "#1C1C1E",
+        fontWeight: "600",
+    },
+    datePickerActionPrimaryText: {
+        color: "#FFFFFF",
+        fontWeight: "700",
     },
     primaryButton: {
         width: "100%",

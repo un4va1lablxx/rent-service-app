@@ -138,19 +138,22 @@ public class AuthService {
 
 
     public TelegramAuthStartResponse startTelegramRegistration(TelegramAuthStartRequest request) {
-        String phoneNumber = normalizePhone(request.phoneNumber());
+        String phoneNumber = normalizeOptionalPhone(request.phoneNumber());
         if (request.fullName() == null || request.fullName().isBlank()) {
             throw new ApiException("Требуется ввести ФИО");
         }
         validatePassword(request.password());
-        if (userRepository.existsByPhoneNumber(phoneNumber)) {
+        if (phoneNumber != null && userRepository.existsByPhoneNumber(phoneNumber)) {
             throw new ApiException("Пользователь с таким номером телефона уже существует");
         }
         return createPendingTelegramAuth("web_register", phoneNumber, request.fullName().trim(), request.password());
     }
 
     public TelegramAuthStartResponse startTelegramLogin(TelegramAuthStartRequest request) {
-        String phoneNumber = normalizePhone(request.phoneNumber());
+        String phoneNumber = normalizeOptionalPhone(request.phoneNumber());
+        if (phoneNumber == null) {
+            return createPendingTelegramAuth("web_login", null, null, null);
+        }
         User user = userRepository.findByPhoneNumber(phoneNumber)
                 .orElseThrow(() -> new ApiException("Пользователь не найден"));
         if (user.isBlocked()) {
@@ -176,7 +179,7 @@ public class AuthService {
         }
 
         String normalizedPhone = normalizePhone(phoneNumber);
-        if (!pending.phoneNumber().equals(normalizedPhone)) {
+        if (pending.phoneNumber() != null && !pending.phoneNumber().equals(normalizedPhone)) {
             throw new ApiException("Полученный номер телефона не совпадает с введенным при регистрации на сайте!");
         }
 
@@ -286,9 +289,16 @@ public class AuthService {
 
     private String normalizePhone(String phoneNumber) {
         if (phoneNumber == null || !phoneNumber.matches("^\\+?[0-9]{10,15}$")) {
-            throw new ApiException("Phone must match +79991234567 format");
+            throw new ApiException("Телефон должен соответствовать формату +7XXXXXXXXXX");
         }
         return phoneNumber.trim();
+    }
+
+    private String normalizeOptionalPhone(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.isBlank() || "+7".equals(phoneNumber.trim())) {
+            return null;
+        }
+        return normalizePhone(phoneNumber);
     }
 
     private TelegramAuthStartResponse createPendingTelegramAuth(String type, String phoneNumber, String fullName, String password) {

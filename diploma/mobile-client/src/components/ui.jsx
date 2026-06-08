@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useRef } from "react";
 import {
     Animated,
     KeyboardAvoidingView,
@@ -118,12 +118,11 @@ export function Icon({ name, isActive = false, onAnimationEnd }) {
 
     const isInteractive = name === "heart";
     // Если иконка интерактивная (сердечко), оборачиваем её в кликабельный контейнер
-    const WrapperComponent = isInteractive ? TouchableOpacity : View;
+    const WrapperComponent = View;
 
     return (
         <WrapperComponent
-            onPress={isInteractive ? handleClick : undefined}
-            activeOpacity={0.7}
+            pointerEvents="none"
             style={isInteractive ? styles.interactiveIconWrapper : null}
         >
             <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>

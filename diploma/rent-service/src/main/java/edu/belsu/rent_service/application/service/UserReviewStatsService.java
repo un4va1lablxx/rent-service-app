@@ -21,7 +21,10 @@ public class UserReviewStatsService {
     }
 
     public UserReviewStats getStats(Long userId) {
-        List<Review> reviews = reviewRepository.findByToUser_Id(userId);
+        List<Review> reviews = reviewRepository.findByToUser_Id(userId)
+                .stream()
+                .filter(review -> !"pending".equalsIgnoreCase(review.getModerationStatus()))
+                .toList();
 
         ScoreAggregate total = calculateAggregate(reviews);
         ScoreAggregate landlord = calculateAggregate(reviews.stream()

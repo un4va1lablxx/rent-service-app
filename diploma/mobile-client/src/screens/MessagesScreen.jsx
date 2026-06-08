@@ -6,7 +6,10 @@ import {
     TextInput,
     TouchableOpacity,
     FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
     Image,
+    Platform,
     StyleSheet,
     useWindowDimensions,
     SafeAreaView,
@@ -17,6 +20,7 @@ import { formatMoscowTime } from "../shared/time";
 import { parseSystemPayload } from "../shared/formUtils";
 import { assetUrl } from "../lib/api";
 import { compactName } from "../shared/formatters";
+import { ArrowLeft, SendHorizontal } from "lucide-react-native";
 
 const Glyph = ({ name, size = 22, color = "#1C1C1E" }) => {
     const glyphs = {
@@ -106,6 +110,7 @@ export const MessagesScreen = (props) => {
     }, [activeDialogMessages]);
 
     const openDialog = (dialog) => {
+        Keyboard.dismiss();
         setActiveDialogKey(dialogKey(dialog));
         loadDialogMessages(dialog);
         if (!isLargeScreen) {
@@ -178,6 +183,11 @@ export const MessagesScreen = (props) => {
 
     return (
         <SafeAreaView style={styles.container}>
+            <KeyboardAvoidingView
+                style={styles.keyboardAvoider}
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+            >
             <View style={[styles.innerContainer, showDialogList ? styles.showSidebar : styles.showChat]}>
                 {/* Сайдбар со списком диалогов */}
                 {showDialogList && (
@@ -207,6 +217,7 @@ export const MessagesScreen = (props) => {
                                 keyExtractor={(item) => dialogKey(item)}
                                 renderItem={renderDialogItem}
                                 showsVerticalScrollIndicator={false}
+                                keyboardShouldPersistTaps="always"
                                 contentContainerStyle={styles.dialogsList}
                             />
                         )}
@@ -230,19 +241,24 @@ export const MessagesScreen = (props) => {
                                     <View style={styles.chatUserInfo}>
                                         <TouchableOpacity
                                             style={styles.backButton}
-                                            onPress={() => setShowDialogList(true)}
+                                            onPress={() => {
+                                                Keyboard.dismiss();
+                                                setActiveDialogKey(null);
+                                                setShowDialogList(true);
+                                            }}
                                         >
-                                            <Glyph name="arrow-back" size={28} color="#007AFF" />
+                                            <ArrowLeft size={25} color="#007AFF" strokeWidth={2.7} />
                                         </TouchableOpacity>
                                         <UserAvatar
                                             name={selectedDialog.otherUserName}
                                             avatarUrl={selectedDialog.otherUserAvatarUrl}
-                                            size={40}
+                                            size={50}
                                         />
                                         <View style={styles.chatUserText}>
-                                            <Text style={styles.chatUserName}>{selectedDialog.otherUserName}</Text>
+                                            <Text style={styles.chatUserName}>{compactName(selectedDialog.otherUserName) || selectedDialog.otherUserName}</Text>
                                             <TouchableOpacity
                                                 onPress={async () => {
+                                                    Keyboard.dismiss();
                                                     const ad = await adsApi.details(selectedDialog.adId);
                                                     setSelectedAd({ ...ad, _viewOnly: true });
                                                     setSelectedAdId(selectedDialog.adId);
@@ -256,21 +272,28 @@ export const MessagesScreen = (props) => {
                                     </View>
                                     <TouchableOpacity
                                         style={styles.viewingButton}
-                                        onPress={() => setViewingModal({ open: true, date: "", time: "" })}
+                                        onPress={() => {
+                                            Keyboard.dismiss();
+                                            setViewingModal({ open: true, date: "", time: "" });
+                                        }}
                                     >
                                         <Text style={styles.viewingButtonText}>Предложить время просмотра</Text>
                                     </TouchableOpacity>
                                 </View>
 
+                                <View style={styles.messagesIsland}>
                                 <FlatList
                                     data={groupedMessages}
                                     keyExtractor={(_, index) => `group-${index}`}
                                     renderItem={renderMessageGroup}
                                     contentContainerStyle={styles.messagesList}
                                     showsVerticalScrollIndicator={false}
+                                    keyboardShouldPersistTaps="always"
                                 />
+                                </View>
 
                                 <View style={styles.composeBar}>
+                                    <View style={styles.composeInputIsland}>
                                     <TextInput
                                         style={styles.composeInput}
                                         placeholder="Напишите сообщение..."
@@ -280,19 +303,24 @@ export const MessagesScreen = (props) => {
                                         numberOfLines={1}
                                         onKeyPress={({ nativeEvent }) => {
                                             if (nativeEvent.key === "Enter" && !nativeEvent.shiftKey) {
+                                                Keyboard.dismiss();
                                                 handleSendMessage();
                                             }
                                         }}
                                     />
+                                    </View>
                                     <TouchableOpacity
                                         style={[
                                             styles.sendButton,
                                             (!composeText.trim() || loadingMap["send-message"]) && styles.sendButtonDisabled,
                                         ]}
-                                        onPress={handleSendMessage}
+                                        onPress={() => {
+                                            Keyboard.dismiss();
+                                            handleSendMessage();
+                                        }}
                                         disabled={loadingMap["send-message"] || !composeText.trim()}
                                     >
-                                        <Glyph name="send" size={20} color={composeText.trim() ? "#007AFF" : "#C6C6C8"} />
+                                        <SendHorizontal size={25} color={composeText.trim() ? "#007AFF" : "#C6C6C8"} strokeWidth={2.7} />
                                     </TouchableOpacity>
                                 </View>
                             </>
@@ -300,6 +328,7 @@ export const MessagesScreen = (props) => {
                     </View>
                 )}
             </View>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 };
@@ -313,6 +342,13 @@ const styles = StyleSheet.create({
     innerContainer: {
         flex: 1,
         flexDirection: "row",
+        paddingHorizontal: 12,
+        paddingTop: 12,
+        paddingBottom: 12,
+        gap: 12,
+    },
+    keyboardAvoider: {
+        flex: 1,
     },
     showSidebar: {
         // стиль не обязателен, просто для маркера
@@ -323,8 +359,12 @@ const styles = StyleSheet.create({
     sidebar: {
         flex: 1,
         backgroundColor: "#FFFFFF",
-        borderRightWidth: StyleSheet.hairlineWidth,
-        borderRightColor: "#E5E5EA",
+        borderRadius: 24,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 18,
+        elevation: 5,
     },
     sidebarHeader: {
         flexDirection: "row",
@@ -357,13 +397,17 @@ const styles = StyleSheet.create({
         color: "#1C1C1E",
     },
     dialogsList: {
+        paddingHorizontal: 8,
         paddingVertical: 8,
+        paddingBottom: 8,
     },
     dialogItem: {
         flexDirection: "row",
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         paddingVertical: 12,
         alignItems: "center",
+        borderRadius: 18,
+        marginBottom: 4,
     },
     dialogItemActive: {
         backgroundColor: "#E5F0FF",
@@ -410,7 +454,8 @@ const styles = StyleSheet.create({
     },
     chatArea: {
         flex: 2,
-        backgroundColor: "#FFFFFF",
+        backgroundColor: "transparent",
+        gap: 10,
     },
     chatPlaceholder: {
         flex: 1,
@@ -436,8 +481,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: "#E5E5EA",
+        backgroundColor: "#FFFFFF",
+        borderRadius: 24,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 18,
+        elevation: 5,
     },
     chatUserInfo: {
         flexDirection: "row",
@@ -445,7 +495,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     backButton: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         marginRight: 8,
+        backgroundColor: "transparent",
+        alignItems: "center",
+        justifyContent: "center",
     },
     chatUserText: {
         marginLeft: 12,
@@ -466,11 +522,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 20,
+        maxWidth: 150,
+        alignItems: "center",
     },
     viewingButtonText: {
         fontSize: 13,
         color: "#007AFF",
         fontWeight: "500",
+        textAlign: "center",
+    },
+    messagesIsland: {
+        flex: 1,
+        backgroundColor: "#FFFFFF",
+        borderRadius: 24,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 18,
+        elevation: 5,
     },
     messagesList: {
         paddingHorizontal: 16,
@@ -492,25 +561,49 @@ const styles = StyleSheet.create({
     composeBar: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: "#E5E5EA",
+        gap: 10,
+        paddingBottom: 10,
+    },
+    composeInputIsland: {
+        flex: 1,
         backgroundColor: "#FFFFFF",
+        borderRadius: 24,
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 18,
+        elevation: 5,
     },
     composeInput: {
-        flex: 1,
+        width: "100%",
         backgroundColor: "#F2F2F7",
         borderRadius: 20,
         paddingHorizontal: 16,
         paddingVertical: 8,
+        minHeight: 40,
+        lineHeight: 20,
         maxHeight: 100,
         fontSize: 14,
         color: "#1C1C1E",
+        includeFontPadding: false,
+        textAlign: "left",
+        textAlignVertical: "center",
     },
     sendButton: {
-        marginLeft: 12,
-        padding: 8,
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: "#FFFFFF",
+        alignItems: "center",
+        justifyContent: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 18,
+        elevation: 5,
     },
     sendButtonDisabled: {
         opacity: 0.5,

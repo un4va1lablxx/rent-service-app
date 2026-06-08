@@ -7,6 +7,7 @@ import {
     FlatList,
     ActivityIndicator,
 } from "react-native";
+import { Pencil, Trash2 } from "lucide-react-native";
 
 // Метаданные статусов
 const STATUS_META = {
@@ -26,33 +27,54 @@ const resolveAdStatus = (ad) => {
     return STATUS_META[moderationStatus] || STATUS_META.active;
 };
 
+const hexToRgba = (hex, alpha) => {
+    const normalized = String(hex || "#8E8E93").replace("#", "");
+    const value = parseInt(normalized.length === 3 ? normalized.split("").map((c) => c + c).join("") : normalized, 16);
+    const r = (value >> 16) & 255;
+    const g = (value >> 8) & 255;
+    const b = value & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const darkenHex = (hex, amount = 28) => {
+    const normalized = String(hex || "#8E8E93").replace("#", "");
+    const value = parseInt(normalized.length === 3 ? normalized.split("").map((c) => c + c).join("") : normalized, 16);
+    const r = Math.max(0, ((value >> 16) & 255) - amount);
+    const g = Math.max(0, ((value >> 8) & 255) - amount);
+    const b = Math.max(0, (value & 255) - amount);
+    return `rgb(${r}, ${g}, ${b})`;
+};
+
 export function ManageScreen({ myAds, openDraftModal, adsApi, handleToggleAdActive, handleDeleteAd, loadingMap, ListingCard }) {
     const [mode, setMode] = useState("active");
 
     const filteredAds = useMemo(() => (myAds || []).filter((ad) => {
-        if (isDeletedAd(ad)) return mode === "archive";
+        if (isDeletedAd(ad)) return false;
         return mode === "active" ? ad.active : !ad.active;
     }), [myAds, mode]);
 
     const renderItem = ({ item: ad }) => {
         const status = resolveAdStatus(ad);
-        const deleted = isDeletedAd(ad);
-        const displayAd = deleted ? { ...ad, title: "Объявление удалено", pricePerDay: 0 } : ad;
 
         return (
             <View style={styles.cardContainer}>
                 <ListingCard
-                    ad={displayAd}
-                    disabledOpen={deleted}
-                    mutedMessage={deleted ? "Объявление скрыто" : ""}
+                    ad={ad}
+                    disabledOpen={false}
+                    mutedMessage=""
                     showFavoriteButton={false}
-                    // Кастомный компонент статуса для мобильной карточки
                     statusBadge={
-                        <View style={[styles.badge, { backgroundColor: status.color }]}>
+                        <View style={[
+                            styles.badge,
+                            {
+                                backgroundColor: hexToRgba(status.color, 0.72),
+                                borderColor: darkenHex(status.color),
+                            }
+                        ]}>
                             <Text style={styles.badgeText}>{status.label}</Text>
                         </View>
                     }
-                    footer={!deleted && (
+                    footer={(
                         <View style={styles.actionsRow}>
                             <TouchableOpacity style={styles.ghostBtn} onPress={() => handleToggleAdActive(ad)}>
                                 <Text style={styles.ghostBtnText}>{ad.active ? "Снять" : "Вернуть"}</Text>
@@ -61,13 +83,14 @@ export function ManageScreen({ myAds, openDraftModal, adsApi, handleToggleAdActi
                                 const details = await adsApi.details(ad.id);
                                 openDraftModal(details);
                             }}>
-                                <Text style={styles.editBtnText}>Изменить</Text>
+                                <Pencil size={16} color="#007AFF" strokeWidth={2.2} />
+                                <Text style={styles.editBtnText}>Редактировать</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteAd(ad.id)} disabled={loadingMap[`delete-ad-${ad.id}`]}>
                                 {loadingMap[`delete-ad-${ad.id}`] ? (
                                     <ActivityIndicator size="small" color="#FFF" />
                                 ) : (
-                                    <Text style={styles.deleteBtnText}>Удалить</Text>
+                                    <Trash2 size={18} color="#FF3B30" strokeWidth={2.2} />
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -124,15 +147,16 @@ const styles = StyleSheet.create({
     segBtnActive: { backgroundColor: "#FFF", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
     segText: { color: "#8E8E93", fontWeight: "600" },
     segTextActive: { color: "#1C1C1E" },
+    list: { paddingBottom: 128 },
     cardContainer: { marginHorizontal: 16, marginBottom: 12 },
-    badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-    badgeText: { color: "#FFF", fontSize: 10, fontWeight: "bold" },
-    actionsRow: { flexDirection: "row", marginTop: 12, gap: 8 },
+    badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1.5 },
+    badgeText: { color: "#FFF", fontSize: 12, fontWeight: "bold" },
+    actionsRow: { flexDirection: "row", marginTop: 12, gap: 8, justifyContent: "flex-end", alignItems: "center" },
     ghostBtn: { padding: 8 },
     ghostBtnText: { color: "#007AFF", fontSize: 13 },
-    editBtn: { backgroundColor: "#F2F2F7", padding: 8, borderRadius: 6 },
-    editBtnText: { color: "#1C1C1E", fontSize: 13 },
-    deleteBtn: { backgroundColor: "#FF3B30", padding: 8, borderRadius: 6, minWidth: 70, alignItems: "center" },
+    editBtn: { backgroundColor: "#EAF4FF", paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 6 },
+    editBtnText: { color: "#007AFF", fontSize: 13, fontWeight: "700" },
+    deleteBtn: { backgroundColor: "#FFEAEA", padding: 9, borderRadius: 8, minWidth: 40, alignItems: "center" },
     deleteBtnText: { color: "#FFF", fontSize: 13 },
     emptyState: { alignItems: "center", marginTop: 40 },
     emptyTitle: { color: "#8E8E93", fontSize: 16 }

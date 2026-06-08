@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Linking, ActivityIndicator, Keyboard } from "react-native";
 import { parseSystemPayload } from "../../shared/formUtils";
 import { formatMoscowTime } from "../../shared/time";
 import { assetUrl } from "../../lib/api";
@@ -21,7 +21,7 @@ const renderTextMessage = (message, profile, isOutgoing) => (
             <Text style={[styles.messageText, isOutgoing && styles.outgoingText]}>
                 {message.text}
             </Text>
-            <Text style={styles.messageTime}>{formatMoscowTime(message.createdAt)}</Text>
+            <Text style={[styles.messageTime, isOutgoing && styles.outgoingMessageTime]}>{formatMoscowTime(message.createdAt)}</Text>
         </View>
     </View>
 );
@@ -130,7 +130,7 @@ export const renderChatMessage = ({
                     payload.documentUrl && (
                         <TouchableOpacity
                             style={styles.chatLinkButton}
-                            onPress={() => onOpenDocument ? onOpenDocument(payload.documentUrl, "Документ") : Linking.openURL(assetUrl(payload.documentUrl))}
+                            onPress={() => { Keyboard.dismiss(); onOpenDocument ? onOpenDocument(payload.documentUrl, "Документ") : Linking.openURL(assetUrl(payload.documentUrl)); }}
                         >
                             <Text style={styles.chatLinkText}>Открыть</Text>
                         </TouchableOpacity>
@@ -139,7 +139,7 @@ export const renderChatMessage = ({
                 {message.messageType === "payment_success" && payload.receiptUrl && (
                     <TouchableOpacity
                         style={styles.chatLinkButton}
-                        onPress={() => onOpenDocument ? onOpenDocument(payload.receiptUrl, "Чек оплаты") : Linking.openURL(assetUrl(payload.receiptUrl))}
+                        onPress={() => { Keyboard.dismiss(); onOpenDocument ? onOpenDocument(payload.receiptUrl, "Чек оплаты") : Linking.openURL(assetUrl(payload.receiptUrl)); }}
                     >
                         <Text style={styles.chatLinkText}>Скачать чек</Text>
                     </TouchableOpacity>
@@ -149,14 +149,14 @@ export const renderChatMessage = ({
                     <View style={styles.systemMessageActions}>
                         <TouchableOpacity
                             style={styles.ghostButton}
-                            onPress={() => onViewingDecision(message.id, false)}
+                            onPress={() => { Keyboard.dismiss(); onViewingDecision?.(message.id, false); }}
                             disabled={loadingMap[`viewing-decision-${message.id}`]}
                         >
                             <Text style={styles.ghostButtonText}>Отклонить</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.primaryButton}
-                            onPress={() => onViewingDecision(message.id, true)}
+                            onPress={() => { Keyboard.dismiss(); onViewingDecision?.(message.id, true); }}
                             disabled={loadingMap[`viewing-decision-${message.id}`]}
                         >
                             <Text style={styles.primaryButtonText}>Согласиться</Text>
@@ -168,7 +168,7 @@ export const renderChatMessage = ({
                     <View style={styles.systemMessageActions}>
                         <TouchableOpacity
                             style={styles.ghostButton}
-                            onPress={() => onViewingResult(message.relatedId, false)}
+                            onPress={() => { Keyboard.dismiss(); onViewingResult?.(message.relatedId, false); }}
                             disabled={loadingMap[`viewing-result-${message.relatedId}`]}
                         >
                             <Text style={styles.ghostButtonText}>
@@ -177,7 +177,7 @@ export const renderChatMessage = ({
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.primaryButton}
-                            onPress={() => onViewingResult(message.relatedId, true)}
+                            onPress={() => { Keyboard.dismiss(); onViewingResult?.(message.relatedId, true); }}
                             disabled={loadingMap[`viewing-result-${message.relatedId}`]}
                         >
                             <Text style={styles.primaryButtonText}>
@@ -191,7 +191,7 @@ export const renderChatMessage = ({
                     <View style={styles.systemMessageActions}>
                         <TouchableOpacity
                             style={styles.chatLinkButton}
-                            onPress={() => onCreateContract(message.relatedId)}
+                            onPress={() => { Keyboard.dismiss(); onCreateContract?.(message.relatedId); }}
                         >
                             <Text style={styles.chatLinkText}>Заполнить</Text>
                         </TouchableOpacity>
@@ -202,7 +202,7 @@ export const renderChatMessage = ({
                     <View style={styles.systemMessageActionsColumn}>
                         <TouchableOpacity
                             style={styles.chatLinkButton}
-                            onPress={() => onSignContract(message.relatedId, payload)}
+                            onPress={() => { Keyboard.dismiss(); onSignContract?.(message.relatedId, payload); }}
                             disabled={loadingMap[`contract-sign-${message.relatedId}`]}
                         >
                             <Text style={styles.chatLinkText}>Заполнить</Text>
@@ -214,7 +214,7 @@ export const renderChatMessage = ({
                     <View style={styles.systemMessageActionsColumn}>
                         <TouchableOpacity
                             style={styles.secondaryButton}
-                            onPress={() => onOpenDocument ? onOpenDocument(payload.documentUrl, "Договор") : Linking.openURL(assetUrl(payload.documentUrl))}
+                            onPress={() => { Keyboard.dismiss(); onOpenDocument ? onOpenDocument(payload.documentUrl, "Договор") : Linking.openURL(assetUrl(payload.documentUrl)); }}
                         >
                             <Text style={styles.secondaryButtonText}>Открыть</Text>
                         </TouchableOpacity>
@@ -225,7 +225,7 @@ export const renderChatMessage = ({
                     <View style={styles.systemMessageActions}>
                         <TouchableOpacity
                             style={styles.primaryButton}
-                            onPress={() => onOpenPayment(message.relatedId)}
+                            onPress={() => { Keyboard.dismiss(); onOpenPayment?.(message.relatedId); }}
                             disabled={loadingMap["payment-modal"]}
                         >
                             <Text style={styles.primaryButtonText}>Оплатить</Text>
@@ -277,6 +277,9 @@ const styles = StyleSheet.create({
         marginTop: 4,
         alignSelf: "flex-end",
     },
+    outgoingMessageTime: {
+        color: "#EAF4FF",
+    },
 
     // Системные сообщения
     systemMessageCard: {
@@ -284,27 +287,33 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         marginVertical: 8,
         padding: 12,
+        alignSelf: "center",
+        width: "92%",
     },
     systemMessageBody: {
         gap: 8,
+        alignItems: "center",
     },
     systemMessageText: {
         fontSize: 14,
         color: "#1C1C1E",
+        textAlign: "center",
     },
     systemMessageSubtext: {
         fontSize: 12,
         color: "#8E8E93",
+        textAlign: "center",
     },
     systemMessageActions: {
         flexDirection: "row",
-        justifyContent: "flex-end",
+        justifyContent: "center",
         gap: 12,
         marginTop: 8,
+        flexWrap: "wrap",
     },
     systemMessageActionsColumn: {
         flexDirection: "column",
-        alignItems: "flex-start",
+        alignItems: "center",
         gap: 8,
         marginTop: 8,
     },

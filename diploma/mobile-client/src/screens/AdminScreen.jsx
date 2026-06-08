@@ -15,7 +15,8 @@ import {
     ActivityIndicator,
     SafeAreaView,
 } from "react-native";
-import { compactName, roleLabel } from "../shared/formatters";
+import { Search } from "lucide-react-native";
+import { compactName, roleLabel, formatDisplayDate } from "../shared/formatters";
 import {assetUrl, getFullUrl} from "../lib/api";
 
 // ----------------------------------------------------------------------
@@ -180,6 +181,7 @@ export const AdminScreen = (props) => {
 
     const userRows = userSearchApplied ? filteredUsers : adminUsers;
     const adRows = (adSearchApplied ? filteredAds : moderationAds).filter((ad) => {
+        if (ad?.deleted || (ad?.moderationStatus || "").toLowerCase() === "deleted") return false;
         if (adModerationFilter === "all") return true;
         return (ad.moderationStatus || "").toLowerCase() === adModerationFilter;
     });
@@ -391,7 +393,7 @@ export const AdminScreen = (props) => {
         >
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContainer}>
-                    <ScrollView showsVerticalScrollIndicator={false}>
+                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
                         <View style={styles.modalHeader}>
                             <Text style={styles.eyebrow}>Заявка на верификацию</Text>
                             <Text style={styles.modalTitle}>{decisionModal.request?.userName || "Пользователь"}</Text>
@@ -425,7 +427,7 @@ export const AdminScreen = (props) => {
                                 <Text><Text style={styles.bold}>Гражданство:</Text> {decisionModal.request?.passportCitizenship || "-"}</Text>
                                 <Text><Text style={styles.bold}>Паспорт:</Text> {decisionModal.request?.passportNumber || "-"}</Text>
                                 <Text><Text style={styles.bold}>Кем выдан:</Text> {decisionModal.request?.passportIssuedBy || "-"}</Text>
-                                <Text><Text style={styles.bold}>Дата выдачи:</Text> {decisionModal.request?.passportIssuedAt || "-"}</Text>
+                                <Text><Text style={styles.bold}>Дата выдачи:</Text> {formatDisplayDate(decisionModal.request?.passportIssuedAt) || "-"}</Text>
                                 <Text><Text style={styles.bold}>Регистрация:</Text> {decisionModal.request?.passportRegistrationAddress || "-"}</Text>
                             </View>
                         </View>
@@ -489,7 +491,7 @@ export const AdminScreen = (props) => {
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
                 <View style={styles.adminHeader}>
                     <Text style={styles.headerTitle}>Админ-панель</Text>
                     <Text style={styles.headerSubtitle}>Модерация объявлений, пользователей и двухуровневой верификации арендодателей.</Text>
@@ -499,33 +501,22 @@ export const AdminScreen = (props) => {
                     <Text style={styles.statsHeading}>Сводка платформы</Text>
                     <View style={styles.statsGrid}>
                         <View style={styles.statCard}><Text style={styles.statLabel}>Пользователи</Text><Text style={styles.statValue}>{adminStats?.usersCount || 0}</Text></View>
+                        <View style={[styles.statCard, styles.verifiedCard]}><Text style={[styles.statLabel, styles.statLabelNoWrap]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>Верифицированы</Text><Text style={styles.statValue}>{adminUsers.filter((u) => u.verified).length}</Text></View>
+                        <View style={[styles.statCard, styles.dangerCard]}><Text style={styles.statLabel}>Заблокированы</Text><Text style={styles.statValue}>{adminUsers.filter((u) => u.blocked).length}</Text></View>
                         <View style={styles.statCard}><Text style={styles.statLabel}>Объявления</Text><Text style={styles.statValue}>{adminStats?.adsCount || 0}</Text></View>
                         <View style={[styles.statCard, styles.successCard]}><Text style={styles.statLabel}>Одобрено</Text><Text style={styles.statValue}>{adminStats?.approvedAdsCount || adminStats?.activeAdsCount || 0}</Text></View>
                         <View style={[styles.statCard, styles.warningCard]}><Text style={styles.statLabel}>На модерации</Text><Text style={styles.statValue}>{adminStats?.pendingAdsCount || 0}</Text></View>
-                        <View style={styles.statCard}><Text style={styles.statLabel}>Верифицированы</Text><Text style={styles.statValue}>{adminUsers.filter((u) => u.verified).length}</Text></View>
-                        <View style={[styles.statCard, styles.dangerCard]}><Text style={styles.statLabel}>Заблокированы</Text><Text style={styles.statValue}>{adminUsers.filter((u) => u.blocked).length}</Text></View>
                     </View>
                 </View>
 
                 <View style={styles.controlsBar}>
-                    <View style={styles.searchBox}>
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder={searchPlaceholder}
-                            value={searchValue}
-                            onChangeText={updateSearch}
-                        />
-                        <TouchableOpacity style={styles.searchButton} onPress={applySearch}>
-                            <Text style={styles.searchButtonText}>Найти</Text>
-                        </TouchableOpacity>
-                    </View>
                     <View style={styles.tablePicker}>
                         <View style={styles.segmented}>
                             <TouchableOpacity
                                 style={[styles.segment, selectedAdminTable === "verifications" && styles.segmentActive]}
                                 onPress={() => setSelectedAdminTable("verifications")}
                             >
-                                <Text style={[styles.segmentText, selectedAdminTable === "verifications" && styles.segmentTextActive]}>Очередь верификаций</Text>
+                                <Text style={[styles.segmentText, selectedAdminTable === "verifications" && styles.segmentTextActive]}>Верификации</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.segment, selectedAdminTable === "users" && styles.segmentActive]}
@@ -537,9 +528,20 @@ export const AdminScreen = (props) => {
                                 style={[styles.segment, selectedAdminTable === "ads" && styles.segmentActive]}
                                 onPress={() => setSelectedAdminTable("ads")}
                             >
-                                <Text style={[styles.segmentText, selectedAdminTable === "ads" && styles.segmentTextActive]}>Модерация объявлений</Text>
+                                <Text style={[styles.segmentText, selectedAdminTable === "ads" && styles.segmentTextActive]}>Объявления</Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                    <View style={styles.searchBox}>
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder={searchPlaceholder}
+                            value={searchValue}
+                            onChangeText={updateSearch}
+                        />
+                        <TouchableOpacity style={styles.searchButton} onPress={applySearch}>
+                            <Search size={20} color="#FFFFFF" strokeWidth={2.4} />
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -552,19 +554,19 @@ export const AdminScreen = (props) => {
                                     style={[styles.filterSegment, verificationFilter === "pending" && styles.filterSegmentActive]}
                                     onPress={() => setVerificationFilter("pending")}
                                 >
-                                    <Text style={styles.filterSegmentText}>На модерации</Text>
+                                    <Text style={[styles.filterSegmentText, verificationFilter === "pending" && styles.filterSegmentTextActive]}>На модерации</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.filterSegment, verificationFilter === "approved" && styles.filterSegmentActive]}
                                     onPress={() => setVerificationFilter("approved")}
                                 >
-                                    <Text style={styles.filterSegmentText}>Одобрены</Text>
+                                    <Text style={[styles.filterSegmentText, verificationFilter === "approved" && styles.filterSegmentTextActive]}>Одобрены</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.filterSegment, verificationFilter === "rejected" && styles.filterSegmentActive]}
                                     onPress={() => setVerificationFilter("rejected")}
                                 >
-                                    <Text style={styles.filterSegmentText}>Отклонены</Text>
+                                    <Text style={[styles.filterSegmentText, verificationFilter === "rejected" && styles.filterSegmentTextActive]}>Отклонены</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -604,25 +606,25 @@ export const AdminScreen = (props) => {
                                     style={[styles.filterSegment, adModerationFilter === "all" && styles.filterSegmentActive]}
                                     onPress={() => setAdModerationFilter("all")}
                                 >
-                                    <Text style={styles.filterSegmentText}>Все</Text>
+                                    <Text style={[styles.filterSegmentText, adModerationFilter === "all" && styles.filterSegmentTextActive]}>Все</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.filterSegment, adModerationFilter === "approved" && styles.filterSegmentActive]}
                                     onPress={() => setAdModerationFilter("approved")}
                                 >
-                                    <Text style={styles.filterSegmentText}>Одобрены</Text>
+                                    <Text style={[styles.filterSegmentText, adModerationFilter === "approved" && styles.filterSegmentTextActive]}>Одобрены</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.filterSegment, adModerationFilter === "pending" && styles.filterSegmentActive]}
                                     onPress={() => setAdModerationFilter("pending")}
                                 >
-                                    <Text style={styles.filterSegmentText}>На модерации</Text>
+                                    <Text style={[styles.filterSegmentText, adModerationFilter === "pending" && styles.filterSegmentTextActive]}>На модерации</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.filterSegment, adModerationFilter === "rejected" && styles.filterSegmentActive]}
                                     onPress={() => setAdModerationFilter("rejected")}
                                 >
-                                    <Text style={styles.filterSegmentText}>Отклонены</Text>
+                                    <Text style={[styles.filterSegmentText, adModerationFilter === "rejected" && styles.filterSegmentTextActive]}>Отклонены</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -649,6 +651,7 @@ export const AdminScreen = (props) => {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: "#F2F2F7" },
     container: { flex: 1 },
+    scrollContent: { paddingBottom: 128 },
     adminHeader: { backgroundColor: "#FFFFFF", paddingHorizontal: 20, paddingVertical: 22, marginBottom: 14, borderRadius: 18, marginHorizontal: 16, marginTop: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
     headerTitle: { fontSize: 26, lineHeight: 31, fontWeight: "800", color: "#1C1C1E" },
     headerSubtitle: { fontSize: 14, lineHeight: 19, color: "#8E8E93", marginTop: 6 },
@@ -656,15 +659,17 @@ const styles = StyleSheet.create({
     statsHeading: { fontSize: 17, fontWeight: "700", marginBottom: 12 },
     statsGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 12 },
     statCard: { width: "30%", minHeight: 82, backgroundColor: "#F2F2F7", borderRadius: 14, padding: 10, alignItems: "center", justifyContent: "center" },
-    statLabel: { fontSize: 12, color: "#8E8E93" },
+    statLabel: { fontSize: 12, color: "#8E8E93", textAlign: "center" },
+    statLabelNoWrap: { width: "100%" },
     statValue: { fontSize: 20, fontWeight: "700", marginTop: 4 },
     successCard: { backgroundColor: "#E5F5E9" },
+    verifiedCard: { backgroundColor: "#EAF4FF" },
     warningCard: { backgroundColor: "#FFF5E5" },
     dangerCard: { backgroundColor: "#FFEBEE" },
     controlsBar: { marginHorizontal: 16, marginBottom: 14 },
-    searchBox: { flexDirection: "row", backgroundColor: "#FFFFFF", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12, alignItems: "center" },
+    searchBox: { flexDirection: "row", backgroundColor: "#FFFFFF", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, marginTop: 12, alignItems: "center" },
     searchInput: { flex: 1, fontSize: 16, paddingVertical: 8 },
-    searchButton: { backgroundColor: "#007AFF", borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, marginLeft: 8 },
+    searchButton: { backgroundColor: "#007AFF", width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", marginLeft: 8 },
     searchButtonText: { color: "#FFF", fontWeight: "600" },
     tablePicker: { backgroundColor: "#FFFFFF", borderRadius: 16, overflow: "hidden" },
     segmented: { flexDirection: "row", flexWrap: "wrap" },
@@ -679,6 +684,7 @@ const styles = StyleSheet.create({
     filterSegment: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: "#F2F2F7" },
     filterSegmentActive: { backgroundColor: "#007AFF" },
     filterSegmentText: { fontSize: 13, color: "#1C1C1E" },
+    filterSegmentTextActive: { color: "#FFFFFF", fontWeight: "700" },
     // Стили табличных строк
     tableRow: { flexDirection: "row", flexWrap: "wrap", borderBottomWidth: 1, borderBottomColor: "#E5E5EA", paddingVertical: 12, alignItems: "center" },
     tableCell: { paddingHorizontal: 4, marginBottom: 4 },

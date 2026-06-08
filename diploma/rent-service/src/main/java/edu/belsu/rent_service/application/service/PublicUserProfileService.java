@@ -51,6 +51,7 @@ public class PublicUserProfileService {
         List<ReviewResponse> reviews = reviewRepository
                 .findTop20ByToUser_IdOrderByCreatedAtDesc(userId)
                 .stream()
+                .filter(review -> !"pending".equalsIgnoreCase(review.getModerationStatus()))
                 .map(this::mapReview)
                 .toList();
         UserReviewStatsService.UserReviewStats stats = userReviewStatsService.getStats(userId);
@@ -60,8 +61,8 @@ public class PublicUserProfileService {
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
                 .verificationStatus(user.getVerificationStatus())
-                .landlordRating(stats.landlordRating())
-                .landlordReviewsCount(stats.landlordReviewsCount())
+                .landlordRating(stats.rating())
+                .landlordReviewsCount(stats.reviewsCount())
                 .tenantRating(stats.tenantRating())
                 .tenantReviewsCount(stats.tenantReviewsCount())
                 .trustLevel(stats.trustLevel())

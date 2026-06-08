@@ -105,11 +105,13 @@ public class TelegramBot {
             JsonNode message = update.get("message");
             long chatId = message.get("chat").get("id").asLong();
             String text = message.has("text") ? message.get("text").asText() : "";
+            Integer messageId = messageId(message);
 
             UserSession session = userSessions.getOrDefault(chatId, new UserSession(chatId));
             userSessions.put(chatId, session);
 
             if (text.startsWith("/start")) {
+                deleteMessage(chatId, messageId);
                 handleStartCommand(chatId, session, text);
                 return;
             }
@@ -118,13 +120,17 @@ public class TelegramBot {
                 session.setState(UserState.AWAITING_PHONE);
                 sendMessage(chatId, "🔐 Добро пожаловать в Rent Service!\n\nВведите номер телефона для входа или регистрации:\nПример: +79991234567");
             } else if (text.equals("/cancel")) {
+                deleteMessage(chatId, messageId);
                 session.setState(UserState.AUTHENTICATED);
                 session.resetAdData();
                 session.resetSearchFilters();
-                sendMessage(chatId, "❌ Операция отменена");
+                clearScenarioMessages(chatId, session);
+                sendMessage(chatId, "Операция отменена");
             } else if (text.equals("/search")) {
+                deleteMessage(chatId, messageId);
                 startSearch(chatId, session);
             } else if (text.equals("/new_ad")) {
+                deleteMessage(chatId, messageId);
                 startCreateAd(chatId, session);
             } else {
                 handleUserInput(chatId, session, text, message);
@@ -137,12 +143,14 @@ public class TelegramBot {
     private void handleStartCommand(long chatId, UserSession session, String text) {
         String[] parts = text.split("\\s+", 2);
         if (parts.length > 1 && (parts[1].startsWith("web_register_") || parts[1].startsWith("web_login_"))) {
+            clearScenarioMessages(chatId, session);
             session.setWebAuthRequestId(parts[1].replaceFirst("^web_(register|login)_", ""));
             session.setState(UserState.AWAITING_WEB_CONTACT);
             sendContactRequest(chatId, "Поделитесь номером телефона для завершения операции.");
             return;
         }
 
+        clearScenarioMessages(chatId, session);
         session.setState(UserState.AWAITING_PHONE);
         sendContactRequest(chatId, "Добро пожаловать в Rent Service. Поделитесь номером телефона для входа или регистрации.");
     }
@@ -150,10 +158,12 @@ public class TelegramBot {
     private void handleCallbackQuery(JsonNode update) {
         JsonNode callback = update.get("callback_query");
         long chatId = callback.get("message").get("chat").get("id").asLong();
+        int callbackMessageId = callback.get("message").get("message_id").asInt();
         String data = callback.get("data").asText();
         UserSession session = userSessions.get(chatId);
 
         if (session == null) return;
+        answerCallback(callback.get("id").asText());
 
         if (data.equals("menu:new_ad")) {
             startCreateAd(chatId, session);
@@ -167,19 +177,23 @@ public class TelegramBot {
             session.setState(UserState.AUTHENTICATED);
             session.resetAdData();
             session.resetSearchFilters();
-            sendMainMenu(chatId, "Операция отменена. Выберите действие:");
+            clearScenarioMessages(chatId, session);
+            sendMessage(chatId, "Операция отменена");
+            return;
+        }
+        if (handleSearchCallback(chatId, callbackMessageId, session, data)) {
             return;
         }
         if (data.startsWith("ad:property:")) {
             session.getAdData().setPropertyType(data.substring("ad:property:".length()));
             session.nextStep();
-            sendRentalTypePicker(chatId);
+            session.rememberCleanupMessage(sendRentalTypePicker(chatId));
             return;
         }
         if (data.startsWith("ad:rental:")) {
             session.getAdData().setRentalType(data.substring("ad:rental:".length()));
             session.nextStep();
-            sendMessage(chatId, "📍 Введите город:");
+            session.rememberCleanupMessage(sendMessage(chatId, "📍 Введите город:"));
             return;
         }
         if (data.equals("photos:done")) {
@@ -201,66 +215,188 @@ public class TelegramBot {
         } else if (data.equals("close")) {
             session.setState(UserState.AUTHENTICATED);
             session.setSearchResults(null);
-            sendMainMenu(chatId, "🔍 Поиск завершён. Выберите следующее действие:");
+            deleteSearchResultMessages(chatId, session);
         }
     }
 
     private void startSearch(long chatId, UserSession session) {
         if (session.getState() != UserState.AUTHENTICATED) {
-            sendMessage(chatId, "❌ Пожалуйста, сначала авторизуйтесь через /start");
+            sendMessage(chatId, "Авторизуйтесь, поделившись номером телефона.");
             return;
         }
 
         session.setState(UserState.SEARCHING);
         session.resetSearchFilters();
+        clearScenarioMessages(chatId, session);
 
-        sendMessage(chatId, "🔍 Поиск объявлений\n\n" +
-                "Введите параметры поиска одной строкой в формате:\n" +
-                "город, тип аренды, цена от, цена до\n\n" +
-                "Примеры:\n" +
-                "• Москва, долгосрочная, 30000, 50000\n" +
-                "• Санкт-Петербург, посуточно, 2000, 4000\n\n" +
-                "Или отправьте /cancel для отмены");
+        String keyboard = "{\"inline_keyboard\":["
+                + "[{\"text\":\"Посуточная аренда\",\"callback_data\":\"search:type:short_term\"}],"
+                + "[{\"text\":\"Долгосрочная аренда\",\"callback_data\":\"search:type:long_term\"}]"
+                + "]}";
+        session.rememberCleanupMessage(sendMessageWithKeyboard(chatId, "Выберите тип аренды:", keyboard));
     }
 
     private void handleSearch(long chatId, UserSession session, String text) {
         try {
-            String[] parts = text.split(",");
-            String city = parts.length > 0 ? parts[0].trim() : null;
-            String rentalTypeRaw = parts.length > 1 ? parts[1].trim() : null;
-            Integer minPrice = parts.length > 2 ? Integer.parseInt(parts[2].trim()) : null;
-            Integer maxPrice = parts.length > 3 ? Integer.parseInt(parts[3].trim()) : null;
-
-            String rentalType = null;
-            if (rentalTypeRaw != null) {
-                if (rentalTypeRaw.equalsIgnoreCase("посуточно") || rentalTypeRaw.equalsIgnoreCase("short")) {
-                    rentalType = "short_term";
-                } else if (rentalTypeRaw.equalsIgnoreCase("долгосрочная") || rentalTypeRaw.equalsIgnoreCase("long")) {
-                    rentalType = "long_term";
-                }
-            }
-
-            List<AdSummaryResponse> ads = searchAds(city, rentalType, minPrice, maxPrice);
-
-            if (ads.isEmpty()) {
-                sendMessage(chatId, "😔 По вашему запросу ничего не найдено.\n\n" +
-                        "Попробуйте изменить параметры поиска или введите /search для нового запроса.");
-                session.setState(UserState.AUTHENTICATED);
+            if (session.getAwaitingSearchField() == null) {
+                sendSearchBuilder(chatId, session);
                 return;
             }
-
-            session.setSearchResults(ads);
-            session.setCurrentSearchIndex(0);
-            session.setCurrentSearchIndex(0);
-            sendAdCard(chatId, session, ads.get(0), 0, ads.size());
+            applySearchFieldValue(session, text);
+            deleteMessage(chatId, session.getSearchInputPromptMessageId());
+            session.setSearchInputPromptMessageId(null);
+            updateSearchBuilder(chatId, session);
 
         } catch (Exception e) {
-            sendMessage(chatId, "❌ Ошибка при поиске. Проверьте формат ввода.\n\n" +
-                    "Пример: `Москва, долгосрочная, 30000, 50000`");
+            session.rememberCleanupMessage(sendMessage(chatId, "Не удалось применить фильтр. Проверьте формат ввода."));
         }
     }
 
-    private List<AdSummaryResponse> searchAds(String city, String rentalType, Integer minPrice, Integer maxPrice) {
+    private boolean handleSearchCallback(long chatId, int callbackMessageId, UserSession session, String data) {
+        if (!data.startsWith("search:")) {
+            return false;
+        }
+
+        if (data.startsWith("search:type:")) {
+            session.setSearchRentalType(data.substring("search:type:".length()));
+            deleteMessage(chatId, callbackMessageId);
+            sendSearchBuilder(chatId, session);
+            return true;
+        }
+
+        if (data.equals("search:edit")) {
+            editMessageText(chatId, callbackMessageId, buildSearchBuilderText(session), buildSearchEditKeyboard(session));
+            return true;
+        }
+
+        if (data.startsWith("search:field:")) {
+            session.setAwaitingSearchField(data.substring("search:field:".length()));
+            session.setSearchInputPromptMessageId(sendMessage(chatId, searchFieldPrompt(session.getAwaitingSearchField())));
+            session.rememberCleanupMessage(session.getSearchInputPromptMessageId());
+            return true;
+        }
+
+        if (data.equals("search:reset")) {
+            String rentalType = session.getSearchRentalType();
+            Integer builderMessageId = session.getSearchBuilderMessageId();
+            session.resetSearchFilters();
+            session.setSearchRentalType(rentalType);
+            session.setSearchBuilderMessageId(builderMessageId);
+            updateSearchBuilder(chatId, session);
+            return true;
+        }
+
+        if (data.equals("search:results")) {
+            List<AdSummaryResponse> ads = searchAds(
+                    session.getSearchCity(),
+                    session.getSearchRentalType(),
+                    session.getSearchMinPrice(),
+                    session.getSearchMaxPrice(),
+                    session.getSearchRooms(),
+                    session.getUserId()
+            );
+            if (ads.isEmpty()) {
+                session.rememberCleanupMessage(sendMessage(chatId, "По выбранным фильтрам ничего не найдено."));
+                return true;
+            }
+            session.setSearchResults(ads);
+            session.setCurrentSearchIndex(0);
+            deleteMessage(chatId, session.getSearchBuilderMessageId());
+            session.setSearchBuilderMessageId(null);
+            clearScenarioMessages(chatId, session);
+            sendAdCard(chatId, session, ads.get(0), 0, ads.size());
+            return true;
+        }
+
+        return true;
+    }
+
+    private void sendSearchBuilder(long chatId, UserSession session) {
+        Integer messageId = sendMessageWithKeyboard(chatId, buildSearchBuilderText(session), buildSearchMainKeyboard());
+        session.setSearchBuilderMessageId(messageId);
+    }
+
+    private void updateSearchBuilder(long chatId, UserSession session) {
+        session.setAwaitingSearchField(null);
+        Integer builderMessageId = session.getSearchBuilderMessageId();
+        if (builderMessageId == null) {
+            sendSearchBuilder(chatId, session);
+            return;
+        }
+        editMessageText(chatId, builderMessageId, buildSearchBuilderText(session), buildSearchMainKeyboard());
+    }
+
+    private String buildSearchBuilderText(UserSession session) {
+        StringBuilder text = new StringBuilder();
+        text.append("Ваши фильтры:\n");
+        text.append("Тип аренды: ").append(rentalTypeLabel(session.getSearchRentalType())).append("\n");
+        text.append("Город: ").append(session.getSearchCity() == null ? "[Не выбрано]" : session.getSearchCity()).append("\n");
+        text.append("Комнат: ").append(session.getSearchRooms() == null ? "[Любые]" : session.getSearchRooms()).append("\n");
+        text.append("Ценовой диапазон: ").append(formatPriceRange(session)).append("\n");
+        if ("short_term".equals(session.getSearchRentalType())) {
+            text.append("Даты: ").append(session.getSearchDates() == null ? "[Не выбраны]" : session.getSearchDates()).append("\n");
+        }
+        return text.toString();
+    }
+
+    private String buildSearchMainKeyboard() {
+        return "{\"inline_keyboard\":["
+                + "[{\"text\":\"Изменить\",\"callback_data\":\"search:edit\"}],"
+                + "[{\"text\":\"Показать результаты\",\"callback_data\":\"search:results\"}],"
+                + "[{\"text\":\"Сбросить\",\"callback_data\":\"search:reset\"}]"
+                + "]}";
+    }
+
+    private String buildSearchEditKeyboard(UserSession session) {
+        List<String> rows = new ArrayList<>();
+        rows.add("[{\"text\":\"Изменить город\",\"callback_data\":\"search:field:city\"}]");
+        rows.add("[{\"text\":\"Изменить ценовой диапазон\",\"callback_data\":\"search:field:price\"}]");
+        rows.add("[{\"text\":\"Изменить кол-во комнат\",\"callback_data\":\"search:field:rooms\"}]");
+        if ("short_term".equals(session.getSearchRentalType())) {
+            rows.add("[{\"text\":\"Изменить даты\",\"callback_data\":\"search:field:dates\"}]");
+        }
+        rows.add("[{\"text\":\"Показать результаты\",\"callback_data\":\"search:results\"}]");
+        rows.add("[{\"text\":\"Сбросить\",\"callback_data\":\"search:reset\"}]");
+        return "{\"inline_keyboard\":[" + String.join(",", rows) + "]}";
+    }
+
+    private String searchFieldPrompt(String field) {
+        return switch (field) {
+            case "city" -> "Введите город:";
+            case "price" -> "Введите ценовой диапазон в формате: от-до. Например: 30000-50000";
+            case "rooms" -> "Введите количество комнат:";
+            case "dates" -> "Введите даты поиска в свободном формате, например: 10.06.2026-15.06.2026";
+            default -> "Введите значение:";
+        };
+    }
+
+    private void applySearchFieldValue(UserSession session, String text) {
+        String value = text == null ? "" : text.trim();
+        switch (session.getAwaitingSearchField()) {
+            case "city" -> session.setSearchCity(value.isBlank() ? null : value);
+            case "rooms" -> session.setSearchRooms(value.isBlank() ? null : Integer.parseInt(value));
+            case "dates" -> session.setSearchDates(value.isBlank() ? null : value);
+            case "price" -> {
+                String[] parts = value.split("[-–—]");
+                session.setSearchMinPrice(parts.length > 0 && !parts[0].trim().isBlank() ? Integer.parseInt(parts[0].trim()) : null);
+                session.setSearchMaxPrice(parts.length > 1 && !parts[1].trim().isBlank() ? Integer.parseInt(parts[1].trim()) : null);
+            }
+            default -> {
+            }
+        }
+    }
+
+    private String formatPriceRange(UserSession session) {
+        if (session.getSearchMinPrice() == null && session.getSearchMaxPrice() == null) {
+            return "[Не выбран]";
+        }
+        return (session.getSearchMinPrice() == null ? "0" : session.getSearchMinPrice())
+                + " - "
+                + (session.getSearchMaxPrice() == null ? "∞" : session.getSearchMaxPrice())
+                + " ₽";
+    }
+
+    private List<AdSummaryResponse> searchAds(String city, String rentalType, Integer minPrice, Integer maxPrice, Integer rooms, Long currentUserId) {
         try {
             List<String> params = new ArrayList<>();
             params.add("page=0");
@@ -276,6 +412,9 @@ public class TelegramBot {
             }
             if (maxPrice != null) {
                 params.add("maxPrice=" + maxPrice);
+            }
+            if (rooms != null) {
+                params.add("rooms=" + rooms);
             }
 
             String url = "http://192.168.0.23:8080/api/ads?" + String.join("&", params);
@@ -325,6 +464,10 @@ public class TelegramBot {
                             .pricePerMonth(item.has("pricePerMonth") ? item.get("pricePerMonth").asInt() : null)
                             .pricePerDay(item.has("pricePerDay") ? item.get("pricePerDay").asInt() : null)
                             .maxGuests(item.has("maxGuests") ? item.get("maxGuests").asInt() : null)
+                            .area(item.has("area") && !item.get("area").isNull() ? item.get("area").decimalValue() : null)
+                            .moderationStatus(item.has("moderationStatus") && !item.get("moderationStatus").isNull() ? item.get("moderationStatus").asText() : null)
+                            .active(item.has("active") && item.get("active").asBoolean())
+                            .viewsCount(item.has("viewsCount") && !item.get("viewsCount").isNull() ? item.get("viewsCount").asInt() : null)
                             .primaryPhotoUrl(item.has("primaryPhotoUrl") ? item.get("primaryPhotoUrl").asText() : null)
                             .photoUrls(item.has("photoUrls")
                                     ? objectMapper.convertValue(
@@ -339,11 +482,15 @@ public class TelegramBot {
 
             /* ======= 🔥 ХАРДКОД ФИЛЬТР ======= */
             ads = ads.stream()
+                    .filter(ad -> currentUserId == null || !Objects.equals(ad.ownerId(), currentUserId))
+
                     .filter(ad -> city == null || city.isBlank()
                             || ad.city().equalsIgnoreCase(city.trim()))
 
                     .filter(ad -> rentalType == null
                             || ad.rentalType().equalsIgnoreCase(rentalType))
+
+                    .filter(ad -> rooms == null || Objects.equals(ad.rooms(), rooms))
 
                     .filter(ad -> {
                         if (minPrice == null && maxPrice == null) return true;
@@ -372,53 +519,42 @@ public class TelegramBot {
                             AdSummaryResponse ad,
                             int index,
                             int total) {
+        deleteSearchResultMessages(chatId, session);
+        Optional<JsonNode> detailJson = fetchAdDetailsJson(ad.id());
+        AdSummaryResponse details = detailJson.map(this::summaryFromJson).orElse(ad);
 
-        Integer price = "short_term".equals(ad.rentalType())
-                ? ad.pricePerDay()
-                : ad.pricePerMonth();
+        Integer price = "short_term".equals(details.rentalType())
+                ? details.pricePerDay()
+                : details.pricePerMonth();
 
         String priceStr = price != null ? price + " ₽" : "—";
-        String priceType = "short_term".equals(ad.rentalType())
+        String priceType = "short_term".equals(details.rentalType())
                 ? "сутки"
                 : "месяц";
 
-        String location = ad.city()
-                + (ad.district() != null && !ad.district().isBlank() ? ", " + ad.district() : "")
-                + (ad.region() != null && !ad.region().isBlank() ? ", " + ad.region() : "");
-
-        String description = ad.description() != null
-                ? ad.description()
-                : "Описание отсутствует";
-
-        if (description.length() > 500) {
-            description = description.substring(0, 497) + "...";
-        }
-
-        String text = String.format(
-                "%s\n\n" +
-                        "%s\n\n" +
-                        "📍 Локация: %s\n" +
-                        "💰 Цена: %s / %s\n" +
-                        "🛏️ Комнат: %d\n" +
-                        "👥 Гостей: %d\n\n" +
-                        "📊 %d из %d",
-                ad.title(),
-                description,
-                location,
-                priceStr,
-                priceType,
-                ad.rooms() != null ? ad.rooms() : 0,
-                ad.maxGuests() != null ? ad.maxGuests() : 0,
-                index + 1,
-                total
-        );
+        String text = "Объявление " + (index + 1) + " из " + total + "\n\n"
+                + nullSafe(details.title()) + "\n\n"
+                + "Тип жилья: " + propertyTypeLabel(details.propertyType()) + "\n"
+                + "Цена: " + priceStr + " / " + priceType + "\n"
+                + "Город: " + nullSafe(details.city()) + "\n"
+                + "Адрес: " + detailText(detailJson, "address") + "\n"
+                + "Комнат: " + valueOrAny(details.rooms()) + "\n"
+                + "Площадь: " + (details.area() != null ? details.area().stripTrailingZeros().toPlainString() + " м²" : "Не указана") + "\n"
+                + "Этаж: " + floorText(detailJson) + "\n"
+                + ("short_term".equals(details.rentalType()) ? "Макс. гостей: " + valueOrAny(details.maxGuests()) + "\n" : "")
+                + "Просмотров: " + valueOrAny(details.viewsCount()) + "\n\n"
+                + "Собственник: " + nullSafe(details.userFullName()) + "\n"
+                + "Рейтинг собственника: " + (details.ownerRating() != null ? details.ownerRating() : "Нет оценок") + "\n"
+                + "Отзывы: " + valueOrAny(details.ownerReviewsCount()) + "\n"
+                + "Верификация: " + verificationLabel(details.ownerVerificationStatus()) + "\n\n"
+                + nullSafe(details.description());
 
         List<String> photos = new ArrayList<>();
 
-        if (ad.photoUrls() != null && !ad.photoUrls().isEmpty()) {
-            photos.addAll(ad.photoUrls());
-        } else if (ad.primaryPhotoUrl() != null) {
-            photos.add(ad.primaryPhotoUrl());
+        if (details.photoUrls() != null && !details.photoUrls().isEmpty()) {
+            photos.addAll(details.photoUrls());
+        } else if (details.primaryPhotoUrl() != null) {
+            photos.add(details.primaryPhotoUrl());
         }
 
         List<String> rows = new ArrayList<>();
@@ -432,22 +568,141 @@ public class TelegramBot {
         if (!navigation.isEmpty()) {
             rows.add("[" + String.join(",", navigation) + "]");
         }
-        rows.add("[{\"text\":\"💬 Связаться\",\"url\":\"" + escapeJson(buildChatUrl(ad)) + "\"}]");
-        rows.add("[{\"text\":\"❌ Закрыть\",\"callback_data\":\"close\"}]");
+        rows.add("[{\"text\":\"Связаться\",\"url\":\"" + escapeJson(buildChatUrl(details)) + "\"}]");
+        rows.add("[{\"text\":\"Выйти из поиска\",\"callback_data\":\"close\"}]");
 
         String keyboard = "{\"inline_keyboard\":[" + String.join(",", rows) + "]}";
 
-        sendPhotoAlbum(chatId, photos);
-        sendMessageWithKeyboard(chatId, text, keyboard);
+        List<Integer> sentMessages = new ArrayList<>();
+        if (!photos.isEmpty()) {
+            sentMessages.addAll(sendPhotoAlbum(chatId, photos));
+        }
+        sentMessages.add(sendMessageWithKeyboard(chatId, text, keyboard));
+        session.rememberSearchResultMessages(sentMessages);
     }
 
     private String buildChatUrl(AdSummaryResponse ad) {
         String base = webAppUrl.endsWith("/") ? webAppUrl.substring(0, webAppUrl.length() - 1) : webAppUrl;
         String appLink = mobileDeepLinkScheme + "://chat?adId=" + ad.id()
-                + (ad.ownerId() != null ? "&sellerId=" + ad.ownerId() : "");
+                + (ad.ownerId() != null ? "&sellerId=" + ad.ownerId() : "")
+                + "&adTitle=" + URLEncoder.encode(nullSafe(ad.title()), StandardCharsets.UTF_8)
+                + "&ownerName=" + URLEncoder.encode(nullSafe(ad.userFullName()), StandardCharsets.UTF_8);
         return base + "/?openMobile=1&chatAdId=" + ad.id()
                 + (ad.ownerId() != null ? "&sellerId=" + ad.ownerId() : "")
+                + "&adTitle=" + URLEncoder.encode(nullSafe(ad.title()), StandardCharsets.UTF_8)
+                + "&ownerName=" + URLEncoder.encode(nullSafe(ad.userFullName()), StandardCharsets.UTF_8)
                 + "&appLink=" + URLEncoder.encode(appLink, StandardCharsets.UTF_8);
+    }
+
+    private Optional<JsonNode> fetchAdDetailsJson(Long adId) {
+        if (adId == null) {
+            return Optional.empty();
+        }
+        try {
+            String url = "http://192.168.0.23:8080/api/ads/" + adId;
+            HttpURLConnection conn = createConnection(url);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+
+            if (conn.getResponseCode() != 200) {
+                conn.disconnect();
+                return Optional.empty();
+            }
+
+            JsonNode json = objectMapper.readTree(conn.getInputStream());
+            conn.disconnect();
+            return Optional.of(json);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    private AdSummaryResponse summaryFromJson(JsonNode item) {
+        return AdSummaryResponse.builder()
+                .id(item.get("id").asLong())
+                .ownerId(item.has("ownerId") && !item.get("ownerId").isNull() ? item.get("ownerId").asLong() : null)
+                .title(textOrNull(item, "title"))
+                .userFullName(textOrNull(item, "ownerName"))
+                .ownerAvatarUrl(textOrNull(item, "ownerAvatarUrl"))
+                .ownerRating(item.has("ownerRating") && !item.get("ownerRating").isNull() ? item.get("ownerRating").asDouble() : null)
+                .ownerReviewsCount(item.has("ownerReviewsCount") && !item.get("ownerReviewsCount").isNull() ? item.get("ownerReviewsCount").asInt() : null)
+                .ownerTrustLevel(textOrNull(item, "ownerTrustLevel"))
+                .ownerVerificationStatus(textOrNull(item, "ownerVerificationStatus"))
+                .description(textOrNull(item, "description"))
+                .city(textOrNull(item, "city"))
+                .district(textOrNull(item, "district"))
+                .region(textOrNull(item, "region"))
+                .propertyType(textOrNull(item, "propertyType"))
+                .rentalType(textOrNull(item, "rentalType"))
+                .rooms(item.has("rooms") && !item.get("rooms").isNull() ? item.get("rooms").asInt() : null)
+                .pricePerMonth(item.has("pricePerMonth") && !item.get("pricePerMonth").isNull() ? item.get("pricePerMonth").asInt() : null)
+                .pricePerDay(item.has("pricePerDay") && !item.get("pricePerDay").isNull() ? item.get("pricePerDay").asInt() : null)
+                .maxGuests(item.has("maxGuests") && !item.get("maxGuests").isNull() ? item.get("maxGuests").asInt() : null)
+                .area(item.has("area") && !item.get("area").isNull() ? item.get("area").decimalValue() : null)
+                .moderationStatus(textOrNull(item, "moderationStatus"))
+                .active(item.has("active") && item.get("active").asBoolean())
+                .viewsCount(item.has("viewsCount") && !item.get("viewsCount").isNull() ? item.get("viewsCount").asInt() : null)
+                .photoUrls(item.has("photoUrls")
+                        ? objectMapper.convertValue(item.get("photoUrls"), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {})
+                        : null)
+                .build();
+    }
+
+    private String textOrNull(JsonNode node, String field) {
+        return node.has(field) && !node.get(field).isNull() ? node.get(field).asText() : null;
+    }
+
+    private String detailText(Optional<JsonNode> node, String field) {
+        return node.map(json -> textOrNull(json, field)).filter(value -> !value.isBlank()).orElse("Не указано");
+    }
+
+    private String nullSafe(String value) {
+        return value == null || value.isBlank() ? "Не указано" : value;
+    }
+
+    private String valueOrAny(Integer value) {
+        return value == null ? "Любые" : String.valueOf(value);
+    }
+
+    private String floorText(Optional<JsonNode> node) {
+        String floor = detailText(node, "floor");
+        String totalFloors = detailText(node, "totalFloors");
+        if ("Не указано".equals(floor)) {
+            return "—";
+        }
+        return floor + "/" + ("Не указано".equals(totalFloors) ? "?" : totalFloors);
+    }
+
+    private String rentalTypeLabel(String rentalType) {
+        if ("short_term".equals(rentalType)) {
+            return "Посуточная";
+        }
+        if ("long_term".equals(rentalType)) {
+            return "Долгосрочная";
+        }
+        return "Не выбран";
+    }
+
+    private String propertyTypeLabel(String propertyType) {
+        if ("house".equals(propertyType)) {
+            return "Дом";
+        }
+        if ("apartment".equals(propertyType)) {
+            return "Квартира";
+        }
+        return nullSafe(propertyType);
+    }
+
+    private String verificationLabel(String status) {
+        if ("trusted_partner".equalsIgnoreCase(status)) {
+            return "Надежный партнер";
+        }
+        if ("owner_verified".equalsIgnoreCase(status)) {
+            return "Собственник подтвержден";
+        }
+        return "Базовая";
     }
 
     private String getFullPhotoUrl(String photoPath) {
@@ -462,17 +717,17 @@ public class TelegramBot {
         return "http://192.168.0.23:8080/uploads/" + photoPath;
     }
 
-    private void sendPhotoAlbum(long chatId, List<String> photoUrls) {
+    private List<Integer> sendPhotoAlbum(long chatId, List<String> photoUrls) {
         try {
             List<String> safePhotoUrls = photoUrls == null ? Collections.emptyList() : photoUrls.stream()
                     .filter(url -> url != null && !url.isBlank())
                     .limit(10)
                     .toList();
 
-            if (safePhotoUrls.isEmpty()) return;
+            if (safePhotoUrls.isEmpty()) return Collections.emptyList();
             if (safePhotoUrls.size() == 1) {
-                sendPhoto(chatId, safePhotoUrls.get(0));
-                return;
+                Integer messageId = sendPhoto(chatId, safePhotoUrls.get(0));
+                return messageId == null ? Collections.emptyList() : List.of(messageId);
             }
 
             List<Map<String, Object>> media = new ArrayList<>();
@@ -495,7 +750,7 @@ public class TelegramBot {
                 media.add(photoItem);
             }
 
-            if (media.isEmpty()) return;
+            if (media.isEmpty()) return Collections.emptyList();
 
             String url = "https://api.telegram.org/bot" + botToken + "/sendMediaGroup";
             String boundary = "RentServiceBoundary" + System.currentTimeMillis();
@@ -515,16 +770,15 @@ public class TelegramBot {
                 os.flush();
             }
 
-            int responseCode = conn.getResponseCode();
-            if (responseCode != 200) {
-                System.err.println("Ошибка отправки альбома: " + responseCode + " " + readErrorBody(conn));
-            }
+            List<Integer> messageIds = extractSentMessageIds(conn);
             conn.disconnect();
+            return messageIds;
         } catch (Exception e) {
             System.err.println("Ошибка отправки альбома: " + e.getMessage());
+            return Collections.emptyList();
         }
     }
-    private void sendMessageWithKeyboard(long chatId, String text, String keyboardJson) {
+    private Integer sendMessageWithKeyboard(long chatId, String text, String keyboardJson) {
         try {
             String url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
             String body = "{\"chat_id\":" + chatId + ",\"text\":\"" + escapeJson(text) + "\",\"reply_markup\":" + keyboardJson + "}";
@@ -539,17 +793,19 @@ public class TelegramBot {
                 os.flush();
             }
 
-            conn.getResponseCode();
+            Integer messageId = extractSentMessageId(conn);
             conn.disconnect();
+            return messageId;
         } catch (Exception e) {
             System.err.println("Ошибка отправки: " + e.getMessage());
+            return null;
         }
     }
 
-    private void sendPhoto(long chatId, String photoUrl) {
+    private Integer sendPhoto(long chatId, String photoUrl) {
         try {
             String fullUrl = getFullPhotoUrl(photoUrl);
-            if (fullUrl == null) return;
+            if (fullUrl == null) return null;
 
             String urlToSend = "https://api.telegram.org/bot" + botToken + "/sendPhoto";
             Path localPath = resolveLocalPhotoPath(photoUrl);
@@ -580,9 +836,129 @@ public class TelegramBot {
             if (responseCode != 200) {
                 System.err.println("Ошибка отправки фото: " + responseCode + " " + readErrorBody(conn));
             }
+            Integer messageId = responseCode == 200 ? extractSentMessageId(conn) : null;
             conn.disconnect();
+            return messageId;
         } catch (Exception e) {
             System.err.println("Ошибка отправки фото: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private Integer sendPhotoWithCaptionKeyboard(long chatId, String photoUrl, String caption, String keyboardJson) {
+        try {
+            String fullUrl = getFullPhotoUrl(photoUrl);
+            if (fullUrl == null) {
+                return sendMessageWithKeyboard(chatId, caption, keyboardJson);
+            }
+
+            String urlToSend = "https://api.telegram.org/bot" + botToken + "/sendPhoto";
+            Path localPath = resolveLocalPhotoPath(photoUrl);
+            String safeCaption = caption.length() > 1000 ? caption.substring(0, 997) + "..." : caption;
+
+            HttpURLConnection conn = createConnection(urlToSend);
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+
+            if (localPath != null && Files.exists(localPath)) {
+                String boundary = "RentServiceBoundary" + System.currentTimeMillis();
+                conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+                try (OutputStream os = conn.getOutputStream()) {
+                    writeFormField(os, boundary, "chat_id", String.valueOf(chatId));
+                    writeFormField(os, boundary, "caption", safeCaption);
+                    writeFormField(os, boundary, "reply_markup", keyboardJson);
+                    writeFileField(os, boundary, "photo", localPath);
+                    os.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
+            } else {
+                conn.setRequestProperty("Content-Type", "application/json");
+                String body = "{\"chat_id\":" + chatId
+                        + ",\"photo\":\"" + escapeJson(fullUrl)
+                        + "\",\"caption\":\"" + escapeJson(safeCaption)
+                        + "\",\"reply_markup\":" + keyboardJson + "}";
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(body.getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
+            }
+
+            Integer messageId = extractSentMessageId(conn);
+            conn.disconnect();
+            return messageId;
+        } catch (Exception e) {
+            System.err.println("Ошибка отправки фото: " + e.getMessage());
+            return sendMessageWithKeyboard(chatId, caption, keyboardJson);
+        }
+    }
+
+    private void editMessageText(long chatId, int messageId, String text, String keyboardJson) {
+        try {
+            String url = "https://api.telegram.org/bot" + botToken + "/editMessageText";
+            String body = "{\"chat_id\":" + chatId
+                    + ",\"message_id\":" + messageId
+                    + ",\"text\":\"" + escapeJson(text)
+                    + "\",\"reply_markup\":" + keyboardJson + "}";
+
+            HttpURLConnection conn = createConnection(url);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(body.getBytes(StandardCharsets.UTF_8));
+                os.flush();
+            }
+
+            conn.getResponseCode();
+            conn.disconnect();
+        } catch (Exception e) {
+            System.err.println("Ошибка редактирования: " + e.getMessage());
+        }
+    }
+
+    private void deleteMessage(long chatId, Integer messageId) {
+        if (messageId == null) return;
+        try {
+            String url = "https://api.telegram.org/bot" + botToken + "/deleteMessage";
+            String body = "{\"chat_id\":" + chatId + ",\"message_id\":" + messageId + "}";
+
+            HttpURLConnection conn = createConnection(url);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(body.getBytes(StandardCharsets.UTF_8));
+                os.flush();
+            }
+
+            conn.getResponseCode();
+            conn.disconnect();
+        } catch (Exception e) {
+            System.err.println("Ошибка удаления сообщения: " + e.getMessage());
+        }
+    }
+
+    private void answerCallback(String callbackId) {
+        try {
+            String url = "https://api.telegram.org/bot" + botToken + "/answerCallbackQuery";
+            String body = "{\"callback_query_id\":\"" + escapeJson(callbackId) + "\"}";
+
+            HttpURLConnection conn = createConnection(url);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(body.getBytes(StandardCharsets.UTF_8));
+                os.flush();
+            }
+
+            conn.getResponseCode();
+            conn.disconnect();
+        } catch (Exception e) {
+            System.err.println("Ошибка ответа callback: " + e.getMessage());
         }
     }
 
@@ -642,7 +1018,7 @@ public class TelegramBot {
         }
     }
 
-    private void sendMessage(long chatId, String text) {
+    private Integer sendMessage(long chatId, String text) {
         try {
             String url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
             String body = "{\"chat_id\":" + chatId + ",\"text\":\"" + escapeJson(text) + "\"}";
@@ -657,46 +1033,114 @@ public class TelegramBot {
                 os.flush();
             }
 
-            conn.getResponseCode();
+            Integer messageId = extractSentMessageId(conn);
             conn.disconnect();
+            return messageId;
         } catch (Exception e) {
             System.err.println("Ошибка отправки: " + e.getMessage());
+            return null;
         }
+    }
+
+    private Integer sendMessageRemoveKeyboard(long chatId, String text) {
+        String keyboard = "{\"remove_keyboard\":true}";
+        return sendMessageWithKeyboard(chatId, text, keyboard);
+    }
+
+    private Integer extractSentMessageId(HttpURLConnection conn) throws IOException {
+        int responseCode = conn.getResponseCode();
+        InputStream stream = responseCode >= 200 && responseCode < 300 ? conn.getInputStream() : conn.getErrorStream();
+        if (stream == null) {
+            return null;
+        }
+        String response = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        if (responseCode < 200 || responseCode >= 300) {
+            System.err.println("Ошибка Telegram API: " + responseCode + " " + response);
+            return null;
+        }
+        JsonNode json = objectMapper.readTree(response);
+        return json.has("result") && json.get("result").has("message_id")
+                ? json.get("result").get("message_id").asInt()
+                : null;
+    }
+
+    private List<Integer> extractSentMessageIds(HttpURLConnection conn) throws IOException {
+        int responseCode = conn.getResponseCode();
+        InputStream stream = responseCode >= 200 && responseCode < 300 ? conn.getInputStream() : conn.getErrorStream();
+        if (stream == null) {
+            return Collections.emptyList();
+        }
+        String response = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        if (responseCode < 200 || responseCode >= 300) {
+            System.err.println("Ошибка Telegram API: " + responseCode + " " + response);
+            return Collections.emptyList();
+        }
+        JsonNode json = objectMapper.readTree(response);
+        if (!json.has("result") || !json.get("result").isArray()) {
+            return Collections.emptyList();
+        }
+        List<Integer> messageIds = new ArrayList<>();
+        for (JsonNode item : json.get("result")) {
+            if (item.has("message_id")) {
+                messageIds.add(item.get("message_id").asInt());
+            }
+        }
+        return messageIds;
+    }
+
+    private Integer messageId(JsonNode message) {
+        return message != null && message.has("message_id") ? message.get("message_id").asInt() : null;
+    }
+
+    private void clearScenarioMessages(long chatId, UserSession session) {
+        for (Integer messageId : session.drainCleanupMessageIds()) {
+            deleteMessage(chatId, messageId);
+        }
+    }
+
+    private void deleteSearchResultMessages(long chatId, UserSession session) {
+        List<Integer> messageIds = new ArrayList<>(session.getSearchResultMessageIds());
+        if (messageIds.isEmpty() && session.getSearchResultMessageId() != null) {
+            messageIds.add(session.getSearchResultMessageId());
+        }
+        for (Integer messageId : messageIds) {
+            deleteMessage(chatId, messageId);
+        }
+        session.getSearchResultMessageIds().clear();
+        session.setSearchResultMessageId(null);
     }
 
     private void sendMainMenu(long chatId, String text) {
         String keyboard = "{\"inline_keyboard\":["
                 + "[{\"text\":\"🏠 Добавить объявление\",\"callback_data\":\"menu:new_ad\"}],"
-                + "[{\"text\":\"🔍 Найти жильё\",\"callback_data\":\"menu:search\"}],"
-                + "[{\"text\":\"❌ Отмена\",\"callback_data\":\"menu:cancel\"}]"
+                + "[{\"text\":\"🔍 Найти жильё\",\"callback_data\":\"menu:search\"}]"
                 + "]}";
         sendMessageWithKeyboard(chatId, text, keyboard);
     }
 
-    private void sendPropertyTypePicker(long chatId) {
+    private Integer sendPropertyTypePicker(long chatId) {
         String keyboard = "{\"inline_keyboard\":["
                 + "[{\"text\":\"Квартира\",\"callback_data\":\"ad:property:apartment\"}],"
                 + "[{\"text\":\"Дом\",\"callback_data\":\"ad:property:house\"}],"
                 + "[{\"text\":\"Отмена\",\"callback_data\":\"menu:cancel\"}]"
                 + "]}";
-        sendMessageWithKeyboard(chatId, "🏘️ Выберите тип жилья:", keyboard);
+        return sendMessageWithKeyboard(chatId, "🏘️ Выберите тип жилья:", keyboard);
     }
 
-    private void sendRentalTypePicker(long chatId) {
+    private Integer sendRentalTypePicker(long chatId) {
         String keyboard = "{\"inline_keyboard\":["
                 + "[{\"text\":\"Долгосрочно\",\"callback_data\":\"ad:rental:long_term\"}],"
                 + "[{\"text\":\"Посуточно\",\"callback_data\":\"ad:rental:short_term\"}],"
                 + "[{\"text\":\"Отмена\",\"callback_data\":\"menu:cancel\"}]"
                 + "]}";
-        sendMessageWithKeyboard(chatId, "🏠 Выберите тип аренды:", keyboard);
+        return sendMessageWithKeyboard(chatId, "🏠 Выберите тип аренды:", keyboard);
     }
 
-    private void sendPhotoStepPrompt(long chatId) {
+    private Integer sendPhotoStepPrompt(long chatId) {
         String keyboard = "{\"inline_keyboard\":["
-                + "[{\"text\":\"Готово, создать объявление\",\"callback_data\":\"photos:done\"}],"
-                + "[{\"text\":\"Отмена\",\"callback_data\":\"menu:cancel\"}]"
+                + "[{\"text\":\"Готово, создать объявление\",\"callback_data\":\"photos:done\"}]"
                 + "]}";
-        sendMessageWithKeyboard(chatId, "📸 Отправьте фотографии. Когда закончите, нажмите кнопку готовности или напишите /done.", keyboard);
+        return sendMessageWithKeyboard(chatId, "📸 Отправьте фотографии.", keyboard);
     }
 
     private void sendContactRequest(long chatId, String text) {
@@ -739,7 +1183,7 @@ public class TelegramBot {
                 boolean existingUser = authService.userExists(sharedPhone);
                 session.setExistingUser(existingUser);
                 session.setState(UserState.AWAITING_PASSWORD);
-                sendMessage(chatId, existingUser ? "Введите пароль для входа:" : "Придумайте пароль для регистрации:");
+                session.rememberCleanupMessage(sendMessageRemoveKeyboard(chatId, existingUser ? "Введите пароль для входа:" : "Придумайте пароль для регистрации:"));
             } catch (Exception e) {
                 sendMessage(chatId, "Ошибка: " + e.getMessage());
                 session.setState(UserState.AWAITING_PHONE);
@@ -761,7 +1205,7 @@ public class TelegramBot {
                         telegramUsername(message)
                 );
                 session.setState(UserState.AUTHENTICATED);
-                sendMessage(chatId, "Номер подтвержден. Вернитесь в веб-приложение, вход завершится автоматически.");
+                sendMessageRemoveKeyboard(chatId, "Номер подтвержден. Вернитесь в веб-приложение, вход завершится автоматически.");
             } catch (Exception e) {
                 sendMessage(chatId, e.getMessage());
             }
@@ -782,11 +1226,15 @@ public class TelegramBot {
                     session.setToken(response.token());
                     session.setRole(response.role());
                     session.setState(UserState.AUTHENTICATED);
+                    deleteMessage(chatId, messageId(message));
+                    clearScenarioMessages(chatId, session);
                     sendMainMenu(chatId, "Вы успешно вошли. Выберите действие:");
                 } else {
+                    deleteMessage(chatId, messageId(message));
+                    clearScenarioMessages(chatId, session);
                     session.setPendingPassword(text);
                     session.setState(UserState.AWAITING_FULL_NAME);
-                    sendMessage(chatId, "Введите ФИО:");
+                    session.rememberCleanupMessage(sendMessage(chatId, "Пароль установлен. Введите ФИО:"));
                 }
             } catch (Exception e) {
                 sendMessage(chatId, "Ошибка: " + e.getMessage());
@@ -807,7 +1255,9 @@ public class TelegramBot {
                 session.setToken(response.token());
                 session.setRole(response.role());
                 session.setState(UserState.AUTHENTICATED);
-                sendMainMenu(chatId, "Регистрация завершена. Выберите действие:");
+                deleteMessage(chatId, messageId(message));
+                clearScenarioMessages(chatId, session);
+                sendMessage(chatId, "Регистрация успешна");
             } catch (Exception e) {
                 sendMessage(chatId, "Ошибка: " + e.getMessage());
             }
@@ -818,6 +1268,7 @@ public class TelegramBot {
     }
 
     private void handleUserInput(long chatId, UserSession session, String text, JsonNode message) {
+        Integer incomingMessageId = messageId(message);
         if (handleAuthInput(chatId, session, text, message)) {
             return;
         }
@@ -833,14 +1284,17 @@ public class TelegramBot {
                 break;
 
             case CREATING_AD:
+                session.rememberCleanupMessage(incomingMessageId);
                 handleAdCreation(chatId, session, text);
                 break;
 
             case AWAITING_PHOTOS:
+                session.rememberCleanupMessage(incomingMessageId);
                 handlePhotoUpload(chatId, session, message);
                 break;
 
             case SEARCHING:
+                deleteMessage(chatId, incomingMessageId);
                 handleSearch(chatId, session, text);
                 break;
 
@@ -851,16 +1305,17 @@ public class TelegramBot {
 
     private void startCreateAd(long chatId, UserSession session) {
         if (session.getState() != UserState.AUTHENTICATED) {
-            sendMessage(chatId, "❌ Пожалуйста, сначала авторизуйтесь через /start");
+            sendMessage(chatId, "Авторизуйтесь, поделившись номером телефона.");
             return;
         }
         if (!session.canPublishAds()) {
-            sendMainMenu(chatId, "❌ Публикация доступна только арендодателям и администраторам. Получите статус арендодателя в профиле веб-приложения.");
+            sendMessage(chatId, "Публикация доступна только арендодателям. Получите статус собственника в личном кабинете платформы на веб-сайте: http://localhost:5173");
             return;
         }
         session.setState(UserState.CREATING_AD);
         session.resetAdData();
-        sendMessage(chatId, "📝 Введите название объявления:");
+        clearScenarioMessages(chatId, session);
+        session.rememberCleanupMessage(sendMessage(chatId, "📝 Введите название объявления:"));
     }
 
     private void handleAdCreation(long chatId, UserSession session, String text) {
@@ -870,39 +1325,39 @@ public class TelegramBot {
             case 0:
                 adData.setTitle(text);
                 session.nextStep();
-                sendPropertyTypePicker(chatId);
+                session.rememberCleanupMessage(sendPropertyTypePicker(chatId));
                 break;
 
             case 1:
-                sendPropertyTypePicker(chatId);
+                session.rememberCleanupMessage(sendPropertyTypePicker(chatId));
                 break;
 
             case 2:
-                sendRentalTypePicker(chatId);
+                session.rememberCleanupMessage(sendRentalTypePicker(chatId));
                 break;
 
             case 3:
                 adData.setCity(text);
                 session.nextStep();
-                sendMessage(chatId, "📍 Введите район:");
+                session.rememberCleanupMessage(sendMessage(chatId, "📍 Введите район:"));
                 break;
 
             case 4:
                 adData.setDistrict(text);
                 session.nextStep();
-                sendMessage(chatId, "📍 Введите регион:");
+                session.rememberCleanupMessage(sendMessage(chatId, "📍 Введите регион:"));
                 break;
 
             case 5:
                 adData.setRegion(text);
                 session.nextStep();
-                sendMessage(chatId, "🏘️ Введите адрес:");
+                session.rememberCleanupMessage(sendMessage(chatId, "🏘️ Введите адрес:"));
                 break;
 
             case 6:
                 adData.setAddress(text);
                 session.nextStep();
-                sendMessage(chatId, "💰 Введите цену " + (adData.getRentalType().equals("long_term") ? "в месяц (₽)" : "за сутки (₽)"));
+                session.rememberCleanupMessage(sendMessage(chatId, "💰 Введите цену " + (adData.getRentalType().equals("long_term") ? "в месяц (₽)" : "за сутки (₽)")));
                 break;
 
             case 7:
@@ -914,9 +1369,9 @@ public class TelegramBot {
                         adData.setPricePerDay(price);
                     }
                     session.nextStep();
-                    sendMessage(chatId, "🛏️ Введите количество комнат:");
+                    session.rememberCleanupMessage(sendMessage(chatId, "🛏️ Введите количество комнат:"));
                 } catch (NumberFormatException e) {
-                    sendMessage(chatId, "❌ Введите число");
+                    session.rememberCleanupMessage(sendMessage(chatId, "❌ Введите число"));
                 }
                 break;
 
@@ -925,12 +1380,12 @@ public class TelegramBot {
                     adData.setRooms(Integer.parseInt(text));
                     session.nextStep();
                     if (adData.getRentalType().equals("short_term")) {
-                        sendMessage(chatId, "👥 Введите максимальное количество гостей:");
+                        session.rememberCleanupMessage(sendMessage(chatId, "👥 Введите максимальное количество гостей:"));
                     } else {
-                        sendMessage(chatId, "📏 Введите площадь (м²):");
+                        session.rememberCleanupMessage(sendMessage(chatId, "📏 Введите площадь (м²):"));
                     }
                 } catch (NumberFormatException e) {
-                    sendMessage(chatId, "❌ Введите число");
+                    session.rememberCleanupMessage(sendMessage(chatId, "❌ Введите число"));
                 }
                 break;
 
@@ -939,9 +1394,9 @@ public class TelegramBot {
                     try {
                         adData.setMaxGuests(Integer.parseInt(text));
                         session.nextStep();
-                        sendMessage(chatId, "📏 Введите площадь (м²):");
+                        session.rememberCleanupMessage(sendMessage(chatId, "📏 Введите площадь (м²):"));
                     } catch (NumberFormatException e) {
-                        sendMessage(chatId, "❌ Введите число");
+                        session.rememberCleanupMessage(sendMessage(chatId, "❌ Введите число"));
                     }
                     break;
                 }
@@ -956,9 +1411,9 @@ public class TelegramBot {
                 try {
                     adData.setFloor(Integer.parseInt(text));
                     session.nextStep();
-                    sendMessage(chatId, "🏢 Введите общее количество этажей:");
+                    session.rememberCleanupMessage(sendMessage(chatId, "🏢 Введите общее количество этажей:"));
                 } catch (NumberFormatException e) {
-                    sendMessage(chatId, "❌ Введите число");
+                    session.rememberCleanupMessage(sendMessage(chatId, "❌ Введите число"));
                 }
                 break;
 
@@ -967,14 +1422,14 @@ public class TelegramBot {
                     if (adData.getRentalType().equals("short_term")) {
                         adData.setFloor(Integer.parseInt(text));
                         session.nextStep();
-                        sendMessage(chatId, "🏢 Введите общее количество этажей:");
+                        session.rememberCleanupMessage(sendMessage(chatId, "🏢 Введите общее количество этажей:"));
                     } else {
                         adData.setTotalFloors(Integer.parseInt(text));
                         session.nextStep();
-                        sendMessage(chatId, "📝 Введите описание объявления:");
+                        session.rememberCleanupMessage(sendMessage(chatId, "📝 Введите описание объявления:"));
                     }
                 } catch (NumberFormatException e) {
-                    sendMessage(chatId, "❌ Введите число");
+                    session.rememberCleanupMessage(sendMessage(chatId, "❌ Введите число"));
                 }
                 break;
 
@@ -983,22 +1438,22 @@ public class TelegramBot {
                     try {
                         adData.setTotalFloors(Integer.parseInt(text));
                         session.nextStep();
-                        sendMessage(chatId, "📝 Введите описание объявления:");
+                        session.rememberCleanupMessage(sendMessage(chatId, "📝 Введите описание объявления:"));
                     } catch (NumberFormatException e) {
-                        sendMessage(chatId, "❌ Введите число");
+                        session.rememberCleanupMessage(sendMessage(chatId, "❌ Введите число"));
                     }
                     break;
                 }
                 adData.setDescription(text);
                 session.nextStep();
-                sendPhotoStepPrompt(chatId);
+                session.rememberCleanupMessage(sendPhotoStepPrompt(chatId));
                 session.setState(UserState.AWAITING_PHOTOS);
                 break;
 
             case 13:
                 adData.setDescription(text);
                 session.nextStep();
-                sendPhotoStepPrompt(chatId);
+                session.rememberCleanupMessage(sendPhotoStepPrompt(chatId));
                 session.setState(UserState.AWAITING_PHOTOS);
                 break;
         }
@@ -1009,9 +1464,9 @@ public class TelegramBot {
             double area = Double.parseDouble(text.replace(',', '.'));
             adData.setArea(area);
             session.nextStep();
-            sendMessage(chatId, "🏢 Введите этаж:");
+            session.rememberCleanupMessage(sendMessage(chatId, "🏢 Введите этаж:"));
         } catch (NumberFormatException e) {
-            sendMessage(chatId, "❌ Введите число");
+            session.rememberCleanupMessage(sendMessage(chatId, "❌ Введите число"));
         }
     }
 
@@ -1022,28 +1477,28 @@ public class TelegramBot {
                 String fileId = photoArray.get(photoArray.size() - 1).get("file_id").asText();
                 String photoUrl = saveTelegramPhoto(fileId, session.getUserId());
                 session.getAdData().addPhotoUrl(photoUrl);
-                sendPhotoStepPrompt(chatId);
             } catch (Exception e) {
                 sendMessage(chatId, "❌ Ошибка при загрузке фото: " + e.getMessage());
             }
         } else if (message.has("text") && message.get("text").asText().equals("/done")) {
             finishBotAdCreation(chatId, session);
         } else {
-            sendPhotoStepPrompt(chatId);
+            session.rememberCleanupMessage(sendMessage(chatId, "Отправьте фото или нажмите кнопку готовности."));
         }
     }
 
     private void finishBotAdCreation(long chatId, UserSession session) {
         try {
             if (!session.canPublishAds()) {
-                sendMainMenu(chatId, "❌ Публикация доступна только арендодателям и администраторам.");
+                sendMessage(chatId, "Публикация доступна только арендодателям. Получите статус собственника в личном кабинете платформы на веб-сайте: http://localhost:5173");
                 return;
             }
             AdRequest adRequest = session.getAdData().buildRequest();
             adService.createFromBot(adRequest, session.getUserId());
             session.setState(UserState.AUTHENTICATED);
             session.resetAdData();
-            sendMainMenu(chatId, "✅ Объявление создано и отправлено на модерацию!");
+            clearScenarioMessages(chatId, session);
+            sendMessage(chatId, "Объявление создано и отправлено на модерацию!");
         } catch (Exception e) {
             sendMessage(chatId, "❌ Ошибка: " + e.getMessage());
         }

@@ -13,6 +13,7 @@ import {
     Alert,
     Linking,
     SafeAreaView,
+    Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -23,6 +24,7 @@ import {
     roleLabel,
     trustLevelMeta,
     verificationStatusMeta,
+    formatDisplayDate,
 } from "../shared/formatters";
 import AddressInput from "../components/AddressInput.jsx";
 import { VerificationBadge } from "../components/listings/ListingComponents.jsx";
@@ -199,6 +201,19 @@ const OptionPicker = ({ value, options, onChange }) => (
 function parseDate(value) {
     const [year, month, day] = String(value || "").split("-").map(Number);
     return year && month && day ? new Date(year, month - 1, day) : new Date();
+}
+
+function verificationToneStyle(tone) {
+    switch (tone) {
+        case "approved":
+            return { borderColor: "#34C759", backgroundColor: "#F0FFF5" };
+        case "pending":
+            return { borderColor: "#FFCC00", backgroundColor: "#FFF9E6" };
+        case "rejected":
+            return { borderColor: "#FF3B30", backgroundColor: "#FFF1F0" };
+        default:
+            return { borderColor: "#E5E5EA", backgroundColor: "#FFFFFF" };
+    }
 }
 
 function formatDate(date) {
@@ -533,16 +548,6 @@ export const ProfileScreen = (props) => {
     }, [trustedRequestData]);
 
     useEffect(() => {
-        if (latestOwnerRequest?.status !== "approved") {
-            setActiveVerificationForm("owner_verified");
-            return;
-        }
-        if (latestTrustedRequest?.status !== "approved") {
-            setActiveVerificationForm("trusted_partner");
-        }
-    }, [latestOwnerRequest?.status, latestTrustedRequest?.status]);
-
-    useEffect(() => {
         setPassportDraft({
             citizenship: profile?.passportCitizenship || "",
             passportNumber: profile?.passportNumber || "",
@@ -845,7 +850,7 @@ export const ProfileScreen = (props) => {
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
                 <View style={styles.mainContent}>
                     {/* Шапка профиля */}
                     <View style={styles.profileHeader}>
@@ -865,8 +870,25 @@ export const ProfileScreen = (props) => {
                             </TouchableOpacity>
                             <View style={styles.nameDetails}>
                                 <View style={styles.nameRow}>
-                                    <Text style={styles.fullName}>{compactName(profile.fullName) || profile.fullName}</Text>
-                                    {isOwnerApproved && <VerificationBadge status={normalizedVerificationStatus} />}
+                                    {(() => {
+                                        const words = (profile.fullName || "Пользователь").trim().split(/\s+/).filter(Boolean);
+                                        const lastWord = words.pop() || "Пользователь";
+                                        return (
+                                            <>
+                                                {words.map((word, index) => (
+                                                    <Text key={`${word}-${index}`} style={styles.fullNameWord}>{word}</Text>
+                                                ))}
+                                                <View style={styles.lastNameWithBadge}>
+                                                    <Text style={styles.fullNameWord}>{lastWord}</Text>
+                                                    {isOwnerApproved && (
+                                                        <View style={styles.profileVerificationBadge}>
+                                                            <VerificationBadge status={normalizedVerificationStatus} />
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            </>
+                                        );
+                                    })()}
                                 </View>
                                 <Text style={styles.phoneNumber}>{profile.phoneNumber}</Text>
                             </View>
@@ -900,23 +922,23 @@ export const ProfileScreen = (props) => {
                     {/* Блок отзывов */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Отзывы</Text>
-                        <View style={styles.segmented}>
+                        <View style={styles.reviewSegmented}>
                             {["received", "landlord", "tenant", "written"].map((scope) => {
                                 if (scope === "landlord" && !canShowLandlordReviews) return null;
                                 return (
                                     <TouchableOpacity
                                         key={scope}
-                                        style={[styles.segment, reviewScope === scope && styles.segmentActive]}
+                                        style={[styles.reviewSegment, reviewScope === scope && styles.segmentActive]}
                                         onPress={() => setReviewScope(scope)}
                                     >
-                                        <Text style={[styles.segmentText, reviewScope === scope && styles.segmentTextActive]}>
+                                        <Text style={[styles.reviewSegmentText, reviewScope === scope && styles.segmentTextActive]} numberOfLines={1} adjustsFontSizeToFit>
                                             {scope === "received"
-                                                ? "Все отзывы"
+                                                ? "Все"
                                                 : scope === "landlord"
-                                                    ? "Как арендодатель"
+                                                    ? "Арендодатель"
                                                     : scope === "tenant"
-                                                        ? "Как арендатор"
-                                                        : "Оставленные мной"}
+                                                        ? "Арендатор"
+                                                        : "Мои"}
                                         </Text>
                                     </TouchableOpacity>
                                 );
@@ -1038,11 +1060,17 @@ export const ProfileScreen = (props) => {
                                 </Text>
                             </View>
                         ) : (
-                            pendingReviewBookings.map((booking) => {
+                            pendingReviewBookings.map((booking, index) => {
                                 const reviewerRole = booking.tenantId === profile.id ? "tenant" : "landlord";
                                 const draft = getReviewDraft(booking);
                                 return (
-                                    <View key={booking.id} style={styles.pendingReviewCard}>
+                                    <View
+                                        key={booking.id}
+                                        style={[
+                                            styles.pendingReviewCard,
+                                            index === pendingReviewBookings.length - 1 && styles.pendingReviewCardLast,
+                                        ]}
+                                    >
                                         <View style={styles.pendingReviewTop}>
                                             <View>
                                                 <Text style={styles.pendingReviewTitle}>{booking.adTitle}</Text>
@@ -1115,7 +1143,7 @@ export const ProfileScreen = (props) => {
                                         <View style={styles.field}>
                                             <Text style={styles.fieldLabel}>Гражданство</Text>
                                             <TextInput
-                                                style={styles.input}
+                                                style={[styles.input, hasSavedPassportDetails && styles.mutedInput]}
                                                 value={passportDraft.citizenship}
                                                 onChangeText={(text) => setPassportDraft((d) => ({ ...d, citizenship: text }))}
                                                 placeholder="Например, РФ"
@@ -1125,7 +1153,7 @@ export const ProfileScreen = (props) => {
                                         <View style={styles.field}>
                                             <Text style={styles.fieldLabel}>Серия и номер паспорта</Text>
                                             <TextInput
-                                                style={styles.input}
+                                                style={[styles.input, hasSavedPassportDetails && styles.mutedInput]}
                                                 value={passportDraft.passportNumber}
                                                 onChangeText={(text) => setPassportDraft((d) => ({ ...d, passportNumber: text }))}
                                                 placeholder="0000 000000"
@@ -1135,7 +1163,7 @@ export const ProfileScreen = (props) => {
                                         <View style={styles.fieldWide}>
                                             <Text style={styles.fieldLabel}>Кем выдан</Text>
                                             <TextInput
-                                                style={styles.input}
+                                                style={[styles.input, hasSavedPassportDetails && styles.mutedInput]}
                                                 value={passportDraft.passportIssuedBy}
                                                 onChangeText={(text) => setPassportDraft((d) => ({ ...d, passportIssuedBy: text }))}
                                                 placeholder="Название подразделения"
@@ -1150,14 +1178,14 @@ export const ProfileScreen = (props) => {
                                                 disabled={hasSavedPassportDetails}
                                             >
                                                 <Text style={[styles.dateButtonText, !passportDraft.passportIssuedAt && styles.dateButtonPlaceholder]}>
-                                                    {passportDraft.passportIssuedAt || "Выбрать дату"}
+                                                    {passportDraft.passportIssuedAt ? formatDisplayDate(passportDraft.passportIssuedAt) : "Выбрать дату"}
                                                 </Text>
                                             </TouchableOpacity>
                                             {passportDatePickerOpen && (
                                                 <DateTimePicker
                                                     value={parseDate(passportDraft.passportIssuedAt)}
                                                     mode="date"
-                                                    display="default"
+                                                    display={Platform.OS === "ios" ? "spinner" : "calendar"}
                                                     onChange={(event, date) => {
                                                         setPassportDatePickerOpen(false);
                                                         if (event.type !== "dismissed" && date) {
@@ -1219,7 +1247,7 @@ export const ProfileScreen = (props) => {
                                         <View style={styles.fieldWide}>
                                             <Text style={styles.fieldLabel}>Банк</Text>
                                             <TextInput
-                                                style={styles.input}
+                                                style={[styles.input, hasSavedPayoutDetails && styles.mutedInput]}
                                                 value={payoutDraft.payoutBankName}
                                                 onChangeText={(text) => setPayoutDraft((d) => ({ ...d, payoutBankName: text }))}
                                                 placeholder="Например, СберБанк"
@@ -1229,7 +1257,7 @@ export const ProfileScreen = (props) => {
                                         <View style={styles.fieldWide}>
                                             <Text style={styles.fieldLabel}>Номер карты</Text>
                                             <TextInput
-                                                style={styles.input}
+                                                style={[styles.input, hasSavedPayoutDetails && styles.mutedInput]}
                                                 value={payoutDraft.payoutAccountNumber}
                                                 onChangeText={(text) => setPayoutDraft((d) => ({ ...d, payoutAccountNumber: text }))}
                                                 placeholder="Введите номер карты"
@@ -1269,7 +1297,7 @@ export const ProfileScreen = (props) => {
                                         style={[
                                             styles.verificationCard,
                                             isOwnerApproved ? styles.statusStatic : styles.clickable,
-                                            { borderLeftColor: ownerCardMeta.tone === "approved" ? "#34C759" : "#FF3B30" },
+                                            verificationToneStyle(ownerCardMeta.tone),
                                             activeVerificationForm === "owner_verified" && styles.activeVerificationCard,
                                         ]}
                                         onPress={() => !isOwnerApproved && setActiveVerificationForm("owner_verified")}
@@ -1280,15 +1308,13 @@ export const ProfileScreen = (props) => {
                                             <Text style={styles.verificationCardStatus}>{ownerCardMeta.label}</Text>
                                         </View>
                                         <Text style={styles.verificationCardCaption}>{ownerCardMeta.caption}</Text>
-                                        <View style={styles.verificationCardIcon}>
-                                            <StatusIcon type={ownerCardMeta.icon} size={24} color="#007AFF" />
-                                        </View>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
                                         style={[
                                             styles.verificationCard,
                                             isTrustedApproved ? styles.statusStatic : styles.clickable,
+                                            verificationToneStyle(trustedCardMeta.tone),
                                             activeVerificationForm === "trusted_partner" && styles.activeVerificationCard,
                                         ]}
                                         onPress={() => !isTrustedApproved && setActiveVerificationForm("trusted_partner")}
@@ -1299,9 +1325,6 @@ export const ProfileScreen = (props) => {
                                             <Text style={styles.verificationCardStatus}>{trustedCardMeta.label}</Text>
                                         </View>
                                         <Text style={styles.verificationCardCaption}>{trustedCardMeta.caption}</Text>
-                                        <View style={styles.verificationCardIcon}>
-                                            <StatusIcon type={trustedCardMeta.icon} size={24} color="#007AFF" />
-                                        </View>
                                     </TouchableOpacity>
                                 </View>
 
@@ -1399,7 +1422,7 @@ export const ProfileScreen = (props) => {
                                                     onValueChange={(val) => setTrustedForm((f) => ({ ...f, consentFsspCheck: val }))}
                                                 />
                                                 <Text style={styles.checkboxLabel}>
-                                                    «Соглашаюсь на осуществление проверки сведений обо мне в Банке данных исполнительных производств Федеральной службы судебных приставов (ФССП России), а также в иных открытых официальных источниках информации».
+                                                    Соглашаюсь на осуществление проверки сведений обо мне в Банке данных исполнительных производств Федеральной службы судебных приставов (ФССП России), а также в иных открытых официальных источниках информации.
                                                 </Text>
                                             </View>
                                             <View style={styles.fieldWide}>
@@ -1434,7 +1457,8 @@ export const ProfileScreen = (props) => {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: "#F2F2F7" },
     container: { flex: 1 },
-    mainContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
+    scrollContent: { paddingBottom: 176 },
+    mainContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
     profileHeader: { marginBottom: 18 },
     eyebrow: { fontSize: 13, color: "#8E8E93", marginBottom: 8 },
     profileNameSection: { flexDirection: "row", alignItems: "center" },
@@ -1445,17 +1469,20 @@ const styles = StyleSheet.create({
     avatarEditBadge: { position: "absolute", bottom: 0, right: 0, backgroundColor: "#007AFF", borderRadius: 12, width: 24, height: 24, justifyContent: "center", alignItems: "center" },
     nameDetails: { flex: 1 },
     nameRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
-    fullName: { fontSize: 22, lineHeight: 27, fontWeight: "800", marginRight: 8, color: "#111113" },
+    fullName: { flexShrink: 1, fontSize: 22, lineHeight: 27, fontWeight: "800", marginRight: 8, color: "#111113" },
+    fullNameWord: { fontSize: 22, lineHeight: 27, fontWeight: "800", marginRight: 5, color: "#111113" },
+    lastNameWithBadge: { flexDirection: "row", alignItems: "center", flexShrink: 0 },
+    profileVerificationBadge: { marginLeft: -1, marginTop: 2 },
     phoneNumber: { fontSize: 14, color: "#8E8E93", marginTop: 4 },
     chipRow: { flexDirection: "row", flexWrap: "wrap", marginBottom: 20, gap: 8 },
     chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
     chipText: { fontSize: 12, fontWeight: "500" },
     metricsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 24, gap: 12 },
     metricCard: { flex: 1, minHeight: 96, backgroundColor: "#FFF", borderRadius: 16, padding: 12, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-    metricLabel: { fontSize: 13, color: "#8E8E93" },
-    ratingValue: { flexDirection: "row", alignItems: "center", marginVertical: 4 },
+    metricLabel: { fontSize: 13, color: "#8E8E93", textAlign: "center" },
+    ratingValue: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginVertical: 4 },
     ratingNumber: { fontSize: 20, fontWeight: "700", marginLeft: 4 },
-    metricCount: { fontSize: 11, color: "#C6C6C8" },
+    metricCount: { fontSize: 11, color: "#C6C6C8", textAlign: "center" },
     section: { marginBottom: 24 },
     sectionTitle: { fontSize: 18, fontWeight: "600", marginBottom: 4 },
     sectionSubtitle: { fontSize: 13, color: "#8E8E93", marginBottom: 12 },
@@ -1464,6 +1491,9 @@ const styles = StyleSheet.create({
     segmentActive: { backgroundColor: "#007AFF" },
     segmentText: { fontSize: 14, color: "#1C1C1E" },
     segmentTextActive: { color: "#FFF", fontWeight: "500" },
+    reviewSegmented: { flexDirection: "row", backgroundColor: "#F2F2F7", borderRadius: 10, padding: 2, marginBottom: 16 },
+    reviewSegment: { flex: 1, minHeight: 38, paddingVertical: 8, paddingHorizontal: 2, alignItems: "center", justifyContent: "center", borderRadius: 8 },
+    reviewSegmentText: { fontSize: 12, color: "#1C1C1E", textAlign: "center" },
     emptyState: { alignItems: "center", paddingVertical: 40, backgroundColor: "#FFF", borderRadius: 16, marginBottom: 16, paddingHorizontal: 14 },
     emptyStateTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
     emptyStateText: { fontSize: 13, color: "#8E8E93", textAlign: "center", paddingHorizontal: 24 },
@@ -1475,7 +1505,7 @@ const styles = StyleSheet.create({
     reviewAvatarInitial: { fontSize: 14, fontWeight: "bold", color: "#636366" },
     reviewAuthorName: { fontWeight: "500" },
     reviewRating: { flexDirection: "row", alignItems: "center", gap: 4 },
-    reviewRatingValue: { fontWeight: "600" },
+    reviewRatingValue: { fontWeight: "600", color: "#FFA000" },
     reviewComment: { fontSize: 14, marginBottom: 8 },
     reviewAdTitle: { fontSize: 12, color: "#8E8E93" },
     reviewCardActions: { flexDirection: "row", justifyContent: "flex-end", marginTop: 12, gap: 12 },
@@ -1486,6 +1516,7 @@ const styles = StyleSheet.create({
     paginationInfo: { fontSize: 14 },
     divider: { height: 1, backgroundColor: "#E5E5EA", marginVertical: 16 },
     pendingReviewCard: { backgroundColor: "#FFF", borderRadius: 16, padding: 12, marginBottom: 12 },
+    pendingReviewCardLast: { marginBottom: 0 },
     pendingReviewTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
     pendingReviewTitle: { fontWeight: "600" },
     pendingReviewPerson: { fontSize: 13, color: "#8E8E93" },
@@ -1506,6 +1537,7 @@ const styles = StyleSheet.create({
     fieldWide: { marginBottom: 12, width: "100%" },
     fieldLabel: { fontSize: 14, fontWeight: "500", marginBottom: 4, color: "#1C1C1E" },
     input: { backgroundColor: "#FFF", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: "#E5E5EA" },
+    mutedInput: { backgroundColor: "#F2F2F7", color: "#8E8E93" },
     textArea: { backgroundColor: "#FFF", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: "#E5E5EA", textAlignVertical: "top", minHeight: 92 },
     dateButton: { minHeight: 46, borderRadius: 12, paddingHorizontal: 14, justifyContent: "center", backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E5E5EA" },
     dateButtonDisabled: { backgroundColor: "#F2F2F7" },
@@ -1541,10 +1573,10 @@ const styles = StyleSheet.create({
     reviewFormTitle: { fontSize: 16, fontWeight: "600", marginBottom: 4 },
     reviewFormSubtitle: { fontSize: 13, color: "#8E8E93", marginBottom: 12 },
     verificationStatusGrid: { gap: 12, marginBottom: 16 },
-    verificationCard: { backgroundColor: "#FFF", borderRadius: 12, padding: 12, borderLeftWidth: 4, borderLeftColor: "#E5E5EA", shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 2, elevation: 1 },
+    verificationCard: { backgroundColor: "#FFF", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#E5E5EA", shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 2, elevation: 1 },
     clickable: { opacity: 1 },
     statusStatic: { opacity: 0.8 },
-    activeVerificationCard: { borderLeftWidth: 4, borderLeftColor: "#007AFF", backgroundColor: "#F0F8FF" },
+    activeVerificationCard: { borderColor: "#007AFF", backgroundColor: "#F0F8FF" },
     verificationCardMain: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
     verificationCardLabel: { fontWeight: "500" },
     verificationCardStatus: { fontWeight: "600", color: "#1C1C1E" },
