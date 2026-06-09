@@ -340,7 +340,10 @@ export const uploadApi = {
       method: "POST",
       body: formData,
       headers: {}
-    });
+    }).then((response) => ({
+      ...response,
+      url: assetUrl(response?.url)
+    }));
   }
 };
 

@@ -7,6 +7,7 @@ import {
 } from "../shared/formatters";
 import AddressInput from "../components/AddressInput.jsx";
 import { VerificationBadge } from "../components/listings/ListingComponents.jsx";
+import { assetUrl } from "../lib/api";
 
 const REVIEW_CATEGORY_CONFIG = {
     tenant: [
@@ -184,14 +185,15 @@ function StatusIcon({ type }) {
 }
 
 function FilePreview({ url, label, onClear }) {
+    const resolvedUrl = assetUrl(url);
     const fileName = url ? decodeURIComponent(String(url).split("/").pop() || label) : "";
     const isImage = /\.(png|jpe?g|webp|gif)$/i.test(fileName);
 
     return (
         <div className="verification-file-card">
-            <a className="verification-file-preview" href={url} target="_blank" rel="noreferrer">
+            <a className="verification-file-preview" href={resolvedUrl} target="_blank" rel="noreferrer">
                 {isImage ? (
-                    <img src={url} alt={label} />
+                    <img src={resolvedUrl} alt={label} />
                 ) : (
                     <div className="verification-file-fallback">{label.slice(0, 2).toUpperCase()}</div>
                 )}
@@ -475,9 +477,9 @@ export function ProfileScreen(props) {
         setOwnerForm((current) => ({
             ...current,
             cadastralNumber: ownerRequestData.cadastralNumber || "",
-            passportDocumentUrl: ownerRequestData.passportDocumentUrl || "",
-            snilsDocumentUrl: ownerRequestData.snilsDocumentUrl || "",
-            egrnDocumentUrl: ownerRequestData.egrnDocumentUrl || "",
+            passportDocumentUrl: assetUrl(ownerRequestData.passportDocumentUrl),
+            snilsDocumentUrl: assetUrl(ownerRequestData.snilsDocumentUrl),
+            egrnDocumentUrl: assetUrl(ownerRequestData.egrnDocumentUrl),
             note: ownerRequestData.note || ""
         }));
     }, [ownerRequestData]);

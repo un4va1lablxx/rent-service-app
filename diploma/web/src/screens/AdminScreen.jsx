@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { roleLabel } from "../shared/formatters";
+import { assetUrl } from "../lib/api";
 
 function formatVerificationType(type) {
     return type === "trusted_partner" ? "Надежный партнер" : "Собственник";
@@ -63,13 +64,14 @@ function getDocumentFileName(url, fallbackLabel) {
 }
 
 function VerificationDocumentPreview({ document }) {
+    const resolvedUrl = assetUrl(document.url);
     const fileName = getDocumentFileName(document.url, document.label);
     const isImage = /\.(png|jpe?g|webp|gif)$/i.test(fileName);
 
     return (
         <div className="verification-file-preview verification-document-preview">
             {isImage ? (
-                <img src={document.url} alt={document.label} />
+                <img src={resolvedUrl} alt={document.label} />
             ) : (
                 <div className="verification-file-fallback">{document.label.slice(0, 2).toUpperCase()}</div>
             )}
@@ -260,7 +262,7 @@ export function AdminScreen(props) {
                 headers.set("Authorization", `Bearer ${token}`);
             }
 
-            const response = await fetch(document.url, { headers });
+            const response = await fetch(assetUrl(document.url), { headers });
             if (!response.ok) {
                 throw new Error(`Не удалось скачать документ (${response.status})`);
             }
