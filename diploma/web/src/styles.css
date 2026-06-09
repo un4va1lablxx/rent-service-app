@@ -29,6 +29,11 @@ body,
   color: var(--text);
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 button,
 input,
 select,
@@ -5421,6 +5426,17 @@ th {
 
   .nav-scroll-button {
     display: none !important;
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .topbar-user-short {
+      display: none;
+    }
+
+    .topbar-nav button {
+      padding-inline: 0.62rem;
+      font-size: 0.82rem;
+    }
   }
 
   .notifications-dropdown {
