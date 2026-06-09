@@ -1,8 +1,21 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
-// Для тестирования на реальном мобильном устройстве вместо localhost используйте адрес из App.js: WEB_APP_URL = "http://192.168.0.23:8080".
-export const API_BASE_URL = "http://192.168.0.23:8080";
+const rawConfiguredApiBaseUrl =
+    process.env.EXPO_PUBLIC_API_BASE_URL
+    || Constants.expoConfig?.extra?.apiBaseUrl
+    || Constants.manifest?.extra?.apiBaseUrl
+    || "";
+
+const configuredApiBaseUrl = rawConfiguredApiBaseUrl.trim();
+
+export const API_BASE_URL = configuredApiBaseUrl.startsWith("$")
+    ? ""
+    : configuredApiBaseUrl.replace(/\/$/, "");
+
+if (!API_BASE_URL) {
+    throw new Error("EXPO_PUBLIC_API_BASE_URL is not configured");
+}
 
 export function assetUrl(url) {
     if (!url) return "";
@@ -13,7 +26,7 @@ export function assetUrl(url) {
     if (/^https?:\/\//i.test(value)) {
         try {
             const parsed = new URL(value);
-            if (["localhost", "127.0.0.1", "10.0.2.2"].includes(parsed.hostname)) {
+            if (["localhost", "127.0.0.1", "10.0.2.2", "192.168.0.23"].includes(parsed.hostname)) {
                 parsed.protocol = base.protocol;
                 parsed.host = base.host;
                 return parsed.toString();
@@ -345,20 +358,26 @@ export const uploadApi = {
       body: formData,
       headers: {}
     });
-    return Array.isArray(urls) ? urls[0] : urls;
+    return assetUrl(Array.isArray(urls) ? urls[0] : urls);
   },
   uploadFile: (file) => {
+    const rawName = file.fileName || file.name || file.uploadName || `file-${Date.now()}.jpg`;
+    const name = /\.[a-z0-9]+$/i.test(rawName) ? rawName : `${rawName}.jpg`;
+    const type = file.mimeType || file.type || (/\.(png)$/i.test(name) ? "image/png" : "image/jpeg");
     const formData = new FormData();
     formData.append("file", {
       uri: file.uri,
-      name: file.fileName || file.name || `file-${Date.now()}.jpg`,
-      type: file.mimeType || file.type || "image/jpeg"
+      name,
+      type
     });
     return request("/api/upload/file", {
       method: "POST",
       body: formData,
       headers: {}
-    });
+    }).then((response) => ({
+      ...response,
+      url: assetUrl(response?.url)
+    }));
   }
 };
 

@@ -64,14 +64,16 @@ function getDocumentFileName(url, fallbackLabel) {
 }
 
 function VerificationDocumentPreview({ document }) {
+    const [imageFailed, setImageFailed] = useState(false);
     const resolvedUrl = assetUrl(document.url);
     const fileName = getDocumentFileName(document.url, document.label);
-    const isImage = /\.(png|jpe?g|webp|gif)$/i.test(fileName);
+    const isPdf = /\.pdf$/i.test(fileName);
+    const shouldTryImage = !isPdf && !imageFailed;
 
     return (
-        <div className="verification-file-preview verification-document-preview">
-            {isImage ? (
-                <img src={resolvedUrl} alt={document.label} />
+        <a className="verification-file-preview verification-document-preview" href={resolvedUrl} target="_blank" rel="noreferrer">
+            {shouldTryImage ? (
+                <img src={resolvedUrl} alt={document.label} onError={() => setImageFailed(true)} />
             ) : (
                 <div className="verification-file-fallback">{document.label.slice(0, 2).toUpperCase()}</div>
             )}
@@ -79,7 +81,7 @@ function VerificationDocumentPreview({ document }) {
                 <strong>{document.label}</strong>
                 <small>{fileName}</small>
             </div>
-        </div>
+        </a>
     );
 }
 

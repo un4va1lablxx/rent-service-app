@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 // Заменяем window.open на нативный модуль для работы со ссылками
 import { Linking } from "react-native";
-import { adminApi, adsApi, assetUrl, authApi, favoritesApi, messagesApi, messagesSocketApi, notificationsApi, storage, usersApi } from "../lib/api";
+import { API_BASE_URL, adminApi, adsApi, assetUrl, authApi, favoritesApi, messagesApi, messagesSocketApi, notificationsApi, storage, usersApi } from "../lib/api";
 import { initialDraft, navItems } from "../shared/appConstants";
 import { dialogKey, normalizeInteger, normalizeNumber } from "../shared/formUtils";
 import { calculateRentalDuration, formatMoscowDateWords } from "../shared/time";
@@ -67,9 +67,6 @@ function createInitialPaymentModal() {
 }
 
 export function useRentServiceApp() {
-    // Базовый URL для мобильной разработки (замени на IP своего ПК в локальной сети)
-    const MOBILE_API_BASE_URL = "http://192.168.0.23:8080";
-
     // НАВЕДЕНИЕ ССЫЛОК (РЕФОВ) ВМЕСТО WEB DOM API
     const messageSocketRef = useRef(null);
     const messageSocketReconnectRef = useRef(null);
@@ -480,7 +477,7 @@ export function useRentServiceApp() {
         try {
             setLoadingMap(prev => ({ ...prev, 'telegram': true }));
             const token = await storage.getToken();
-            const response = await fetch(`${MOBILE_API_BASE_URL}/api/telegram/send-code`, {
+            const response = await fetch(`${API_BASE_URL}/api/telegram/send-code`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -507,7 +504,7 @@ export function useRentServiceApp() {
     async function verifyTelegramCode(code) {
         try {
             const token = await storage.getToken();
-            const response = await fetch(`${MOBILE_API_BASE_URL}/api/telegram/verify`, {
+            const response = await fetch(`${API_BASE_URL}/api/telegram/verify`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

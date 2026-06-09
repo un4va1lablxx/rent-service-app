@@ -221,9 +221,18 @@ function formatDate(date) {
 }
 
 async function normalizePickedPhoto(asset, fallbackName = "photo.jpg") {
-    const name = asset.fileName || fallbackName;
+    const fallback = fallbackName.endsWith(".jpg") ? fallbackName : `${fallbackName}.jpg`;
+    const rawName = asset.fileName || fallback;
+    const name = /\.(png|jpe?g|webp|heic|heif)$/i.test(rawName) ? rawName : fallback;
     const isHeic = /\.(heic|heif)$/i.test(name) || /heic|heif/i.test(asset.mimeType || "");
-    if (!isHeic) return asset;
+    if (!isHeic) {
+        return {
+            ...asset,
+            fileName: name,
+            mimeType: asset.mimeType || (/\.(png)$/i.test(name) ? "image/png" : "image/jpeg")
+        };
+    }
+
     const converted = await ImageManipulator.manipulateAsync(asset.uri, [], {
         compress: 0.92,
         format: ImageManipulator.SaveFormat.JPEG,

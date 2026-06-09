@@ -32,7 +32,7 @@ public class FileUploadService {
             Path uploadPath = getUploadPath();
 
             for (MultipartFile file : files) {
-                String filename = generateSafeFilename(file.getOriginalFilename());
+                String filename = generateSafeFilename(file.getOriginalFilename(), file.getContentType());
                 Path filePath = uploadPath.resolve(filename);
 
                 file.transferTo(filePath.toFile());
@@ -65,7 +65,7 @@ public class FileUploadService {
         try {
             Path uploadPath = getUploadPath();
 
-            String filename = generateSafeFilename(file.getOriginalFilename());
+            String filename = generateSafeFilename(file.getOriginalFilename(), file.getContentType());
             Path filePath = uploadPath.resolve(filename);
 
             file.transferTo(filePath.toFile());
@@ -122,14 +122,30 @@ public class FileUploadService {
         return base + "/uploads/" + filename;
     }
 
-    private String generateSafeFilename(String originalFilename) {
+    private String generateSafeFilename(String originalFilename, String contentType) {
         String extension = "";
 
         if (originalFilename != null && originalFilename.contains(".")) {
             extension = originalFilename.substring(originalFilename.lastIndexOf("."));
         }
+        if (extension.isBlank()) {
+            extension = extensionFromContentType(contentType);
+        }
 
         return UUID.randomUUID() + extension;
+    }
+
+    private String extensionFromContentType(String contentType) {
+        if (contentType == null) {
+            return "";
+        }
+        return switch (contentType.toLowerCase()) {
+            case "image/jpeg", "image/jpg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "application/pdf" -> ".pdf";
+            default -> "";
+        };
     }
 
     private String sanitizeFilename(String filename) {
