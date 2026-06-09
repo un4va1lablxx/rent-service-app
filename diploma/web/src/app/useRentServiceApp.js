@@ -392,6 +392,42 @@ export function useRentServiceApp() {
     }, [profile?.id]);
 
     useEffect(() => {
+        if (!profile?.id) return;
+
+        let disposed = false;
+        let refreshing = false;
+
+        const refresh = async () => {
+            if (disposed || refreshing || document.hidden) {
+                return;
+            }
+            refreshing = true;
+            try {
+                await refreshVisibleContent(profile);
+            } finally {
+                refreshing = false;
+            }
+        };
+
+        const interval = window.setInterval(refresh, 20000);
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                refresh();
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        window.addEventListener("focus", refresh);
+
+        return () => {
+            disposed = true;
+            window.clearInterval(interval);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            window.removeEventListener("focus", refresh);
+        };
+    }, [profile?.id, selectedTab, selectedAdId]);
+
+    useEffect(() => {
         if (profile) {
             setSocialLinks({
                 telegram: profile.telegramUsername || null,
@@ -460,6 +496,51 @@ export function useRentServiceApp() {
             loadAdmin(currentProfile),
             loadNotifications()
         ]);
+    }
+
+    async function refreshVisibleContent(currentProfile = profile) {
+        if (!currentProfile?.id) {
+            await loadAds();
+            return;
+        }
+
+        if (selectedTab === "messages") {
+            await Promise.all([
+                loadNotifications(),
+                loadDialogs(true)
+            ]);
+            if (selectedDialogRef.current) {
+                await loadDialogMessages(selectedDialogRef.current);
+            }
+            return;
+        }
+
+        const tasks = [loadNotifications()];
+
+        if (selectedTab === "discover") {
+            tasks.push(loadAds());
+            if (selectedAdId) {
+                tasks.push(loadAdDetails(selectedAdId));
+            }
+        } else if (selectedTab === "favorites") {
+            tasks.push(loadFavorites(), loadAds());
+        } else if (selectedTab === "manage") {
+            tasks.push(loadMyAds(currentProfile), loadAds());
+        } else if (selectedTab === "admin") {
+            tasks.push(loadAdmin(currentProfile), loadAds());
+        } else if (selectedTab === "profile") {
+            tasks.push(
+                authApi.me().then((me) => {
+                    setProfile(me);
+                    return me;
+                }),
+                loadMyAds(currentProfile)
+            );
+        } else {
+            tasks.push(loadAds());
+        }
+
+        await Promise.all(tasks);
     }
 
     async function sendTelegramCode(username) {
