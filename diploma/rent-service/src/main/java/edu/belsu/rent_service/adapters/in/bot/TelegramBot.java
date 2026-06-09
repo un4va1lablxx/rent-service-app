@@ -39,10 +39,10 @@ public class TelegramBot {
     @Value("${telegram.bot.proxy.port:0}")
     private int proxyPort;
 
-    @Value("${rent.web-app-url:http://192.168.0.23:5173}")
+    @Value("${rent.web-app-url:https://rent-service-app.vercel.app}")
     private String webAppUrl;
 
-    @Value("${rent.api-base-url:http://localhost:8080}")
+    @Value("${rent.api-base-url:https://rent-service-app.onrender.com}")
     private String apiBaseUrl;
 
     @Value("${rent.mobile-deep-link-scheme:rentservice}")
@@ -1328,7 +1328,8 @@ public class TelegramBot {
             return;
         }
         if (!session.canPublishAds()) {
-            sendMessage(chatId, "Публикация доступна только арендодателям. Получите статус собственника в личном кабинете платформы на веб-сайте: " + webBase());            return;
+            sendMessage(chatId, "Публикация доступна только арендодателям. Получите статус собственника в личном кабинете платформы на веб-сайте: " + webBase());
+            return;
         }
         session.setState(UserState.CREATING_AD);
         session.resetAdData();
@@ -1508,7 +1509,7 @@ public class TelegramBot {
     private void finishBotAdCreation(long chatId, UserSession session) {
         try {
             if (!session.canPublishAds()) {
-                sendMessage(chatId, "Публикация доступна только арендодателям. Получите статус собственника в личном кабинете платформы на веб-сайте: http://localhost:5173");
+                sendMessage(chatId, "Публикация доступна только арендодателям. Получите статус собственника в личном кабинете платформы на веб-сайте: " + webBase());
                 return;
             }
             AdRequest adRequest = session.getAdData().buildRequest();

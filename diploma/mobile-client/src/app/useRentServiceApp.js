@@ -271,7 +271,7 @@ export function useRentServiceApp() {
                 }
                 setDialogs((current) => current.map((dialog) => (
                     dialogKey(dialog) === dialogKey(selectedDialog)
-                        ? { ...dialog, otherUserAvatarUrl: avatarUrl }
+                        ? { ...dialog, otherUserAvatarUrl: assetUrl(avatarUrl) }
                         : dialog
                 )));
             } catch {
@@ -1072,7 +1072,7 @@ export function useRentServiceApp() {
                 utilitiesIncluded: snapshot.utilitiesIncluded === true || snapshot.utilitiesIncluded === "true",
                 deposit: snapshot.depositText || "",
                 rules: snapshot.rulesText || "",
-                documentUrl: response?.documentUrl || "",
+                documentUrl: assetUrl(response?.documentUrl || ""),
                 signConfirmed: true
             });
         } catch (err) {
@@ -1206,7 +1206,7 @@ export function useRentServiceApp() {
                 landlordName: payment?.landlordName || "",
                 payoutBankName: payment?.payoutBankName || "",
                 payoutAccountNumberMasked: payment?.payoutAccountNumberMasked || "",
-                receiptUrl: payment?.receiptUrl || ""
+                receiptUrl: assetUrl(payment?.receiptUrl || "")
             });
         } catch (err) {
             setError(err.message);
@@ -1236,7 +1236,7 @@ export function useRentServiceApp() {
             setPaymentModal((current) => ({
                 ...current,
                 status: response?.status || "paid",
-                receiptUrl: response?.receiptUrl || "",
+                receiptUrl: assetUrl(response?.receiptUrl || ""),
                 totalLabel: response?.totalLabel || current.totalLabel,
                 open: true
             }));
@@ -1299,7 +1299,7 @@ export function useRentServiceApp() {
                 area: ad.area ?? "",
                 floor: ad.floor ?? "",
                 totalFloors: ad.totalFloors ?? "",
-                photos: ad.photoUrls || [],
+                photos: (ad.photoUrls || []).map(assetUrl),
             });
         } else {
             setDraft(initialDraft);
@@ -1335,7 +1335,7 @@ export function useRentServiceApp() {
                 area: normalizeNumber(draft.area),
                 floor: normalizeInteger(draft.floor),
                 totalFloors: normalizeInteger(draft.totalFloors),
-                photoUrls: (draft.photos || []).slice(0, 35)
+                photoUrls: (draft.photos || []).map(assetUrl).slice(0, 35)
             };
 
             if (draftModal.ad?.id) {

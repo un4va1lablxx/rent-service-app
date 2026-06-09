@@ -77,7 +77,7 @@ public class UserProfileService {
             throw new ApiException("Загрузите фото профиля");
         }
 
-        user.setAvatarUrl(avatarUrl);
+        user.setAvatarUrl(normalizeUploadUrl(avatarUrl));
         return mapUser(user);
     }
 
@@ -157,6 +157,18 @@ public class UserProfileService {
                 .verified(userReviewStatsService.isVerified(user.getVerificationStatus()))
                 .blocked(user.isBlocked())
                 .build();
+    }
+
+    private String normalizeUploadUrl(String url) {
+        if (!StringUtils.hasText(url)) {
+            return "";
+        }
+        String trimmed = url.trim();
+        int markerIndex = trimmed.indexOf("/uploads/");
+        if (markerIndex >= 0) {
+            return trimmed.substring(markerIndex);
+        }
+        return trimmed;
     }
 
     private String normalizeOptional(String value) {

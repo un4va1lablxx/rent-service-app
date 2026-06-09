@@ -817,7 +817,7 @@ export function ProfileScreen(props) {
                                 hidden
                             />
                             {profile.avatarUrl ? (
-                                <img src={profile.avatarUrl} alt={profile.fullName || "Фото профиля"} />
+                                <img src={assetUrl(profile.avatarUrl)} alt={profile.fullName || "Фото профиля"} />
                             ) : (
                                 <span>{profile.fullName?.charAt(0) || "П"}</span>
                             )}

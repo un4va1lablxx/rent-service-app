@@ -182,6 +182,9 @@ public class VerificationService {
         requestData.put("passportDocumentUrl", requireText(payload.passportDocumentUrl(), "Загрузите паспорт"));
         requestData.put("snilsDocumentUrl", requireText(payload.snilsDocumentUrl(), "Загрузите СНИЛС"));
         requestData.put("egrnDocumentUrl", requireText(payload.egrnDocumentUrl(), "Загрузите выписку ЕГРН или подтверждение права собственности"));
+        requestData.put("passportDocumentUrl", normalizeUploadUrl(asText(requestData.get("passportDocumentUrl"))));
+        requestData.put("snilsDocumentUrl", normalizeUploadUrl(asText(requestData.get("snilsDocumentUrl"))));
+        requestData.put("egrnDocumentUrl", normalizeUploadUrl(asText(requestData.get("egrnDocumentUrl"))));
         responseData.put("rosreestrStatus", "object_found");
         responseData.put("rosreestrMessage", "Объект найден. Ожидается проверка модератором.");
     }
@@ -276,6 +279,18 @@ public class VerificationService {
 
     private String normalizeOptional(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String normalizeUploadUrl(String url) {
+        if (!StringUtils.hasText(url)) {
+            return "";
+        }
+        String trimmed = url.trim();
+        int markerIndex = trimmed.indexOf("/uploads/");
+        if (markerIndex >= 0) {
+            return trimmed.substring(markerIndex);
+        }
+        return trimmed;
     }
 
     private String asText(Object value) {

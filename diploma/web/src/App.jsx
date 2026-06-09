@@ -13,7 +13,8 @@ import {
     storage,
     uploadApi,
     usersApi,
-    verificationApi
+    verificationApi,
+    assetUrl
 } from "./lib/api";
 import { initialDraft, navItems, propertyOptions, roomOptions } from "./shared/appConstants";
 import { Field, Metric, Modal, Icon } from "./components/ui";
@@ -181,7 +182,7 @@ export default function App() {
                                 {notificationsUnread > 0 && <span className="badge">{notificationsUnread}</span>}
                             </button>
                             <div className={`topbar-mini-avatar ${profile?.avatarUrl ? "has-photo" : ""}`}>
-                                {profile?.avatarUrl ? <img src={profile.avatarUrl} alt={shortProfileName} /> : <span>{shortProfileName?.charAt(0) || "П"}</span>}
+                                {profile?.avatarUrl ? <img src={assetUrl(profile.avatarUrl)} alt={shortProfileName} /> : <span>{shortProfileName?.charAt(0) || "П"}</span>}
                             </div>
                             <span className="topbar-user-short">{shortProfileName}</span>
                             <button className="icon-button" type="button" onClick={handleLogout} title="Выйти"><Icon name="logout" /></button>

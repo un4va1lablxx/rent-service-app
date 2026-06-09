@@ -44,7 +44,8 @@ export default function ImageUploader({ existingImages = [], onImagesUploaded })
             }
 
             const urls = await response.json();
-            const nextImages = [...images, ...urls].slice(0, MAX_AD_IMAGES);
+            const normalizedUrls = (Array.isArray(urls) ? urls : [urls]).map(assetUrl);
+            const nextImages = [...images.map(assetUrl), ...normalizedUrls].slice(0, MAX_AD_IMAGES);
             setImages(nextImages);
             onImagesUploaded(nextImages);
         } catch (error) {
@@ -56,7 +57,7 @@ export default function ImageUploader({ existingImages = [], onImagesUploaded })
     };
 
     const removeImage = (indexToRemove) => {
-        const nextImages = images.filter((_, index) => index !== indexToRemove);
+        const nextImages = images.filter((_, index) => index !== indexToRemove).map(assetUrl);
         setImages(nextImages);
         onImagesUploaded(nextImages);
     };
@@ -66,7 +67,7 @@ export default function ImageUploader({ existingImages = [], onImagesUploaded })
             return;
         }
 
-        const nextImages = [...images];
+        const nextImages = images.map(assetUrl);
         const [moved] = nextImages.splice(fromIndex, 1);
         nextImages.splice(toIndex, 0, moved);
         setImages(nextImages);

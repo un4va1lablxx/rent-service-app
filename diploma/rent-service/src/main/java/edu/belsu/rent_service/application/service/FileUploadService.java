@@ -22,9 +22,6 @@ public class FileUploadService {
     @Value("${file.upload-dir:./uploads}")
     private String uploadDir;
 
-    @Value("${app.public-base-url:http://localhost:8080}")
-    private String publicBaseUrl;
-
     public List<String> savePhotos(List<MultipartFile> files, Authentication authentication) {
         List<String> urls = new ArrayList<>();
 
@@ -113,16 +110,7 @@ public class FileUploadService {
     }
 
     private String buildPublicUrl(String filename) {
-        String base = publicBaseUrl == null ? "" : publicBaseUrl.trim();
-
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        if (base.startsWith("https://") && base.contains(".onrender.com:8080")) {
-            base = base.replace(".onrender.com:8080", ".onrender.com");
-        }
-
-        return base + "/uploads/" + filename;
+        return "/uploads/" + filename;
     }
 
     private String generateSafeFilename(String originalFilename, String contentType) {

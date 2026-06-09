@@ -854,7 +854,7 @@ export function AppModals(props) {
                                         <div className="seller-profile-head">
                                             <div className={`seller-profile-avatar ${sellerProfileModal.data?.avatarUrl ? "has-photo" : ""}`}>
                                                 {sellerProfileModal.data?.avatarUrl ? (
-                                                    <img src={sellerProfileModal.data.avatarUrl} alt={sellerProfileModal.data?.fullName || "Профиль"} />
+                                                    <img src={assetUrl(sellerProfileModal.data.avatarUrl)} alt={sellerProfileModal.data?.fullName || "Профиль"} />
                                                 ) : (
                                                     <span>{(sellerProfileModal.data?.fullName || "П").charAt(0)}</span>
                                                 )}

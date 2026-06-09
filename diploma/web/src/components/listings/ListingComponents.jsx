@@ -6,6 +6,29 @@ const OWNER_VERIFIED_BADGE_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgA
 const TRUSTED_PARTNER_BADGE_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEIAAABCCAYAAADjVADoAAAACXBIWXMAAAsTAAALEwEAmpwYAAAERklEQVR4nO2bW4gcVRCGD6sRDepM1WzURSEqXhAVRbwrah6CCCIIXh5EH1SUPIiC4oOgDbtd1ROTKFEk5kHwKcr4Eja7U9W7ykBEELIqooiEjREveMkF1CjrJYmcTpR1dMzk9Onp7pn5oaDp6e6q+rrP6Z5T5xgz1FBDDVVgVeKJsyoSnWkGVSB8DSp9jMoHExP+CJvh1WaQBEJ3gdIvf0M4bMm+mO4w/a4zGutOQOXVKHSgHcIi2w9C4fJWcLzpOzWC40DoYVT+/H8A/NOEdmCTHjBzG5eYUqvROMa2eRB+AZV2dQ2gvbkIfQdCz9eafIUJghFTdFVaQbUm0U2o/BgKvY5Cu12T72y0C4VfQ6FHq026EWbrlfwSnooANbwflNaD0mYQmgPhb/0n3eUTo/QNCG9LYlFab2OzNyVTCNiMbkelvXkl3X3/wntqwrdlAgGa9etR+Pfck+waBv0GOnGtdxAo/E7uyR210dteIVRaQfUI7/6i2n6vHerozPi5BUjKyZYpn+MPxDSfl3dCrmZjH4LQsoAQ/gKV1iWWbA8gCBDehs3g5L982G1Qfm/gQKCGV7b7sfsGDARNd/KFws2BAQExXdcRRMxX9S0IEP4Jld5HpQYoP3Ekf/YYe6w959C5JQcBSrMQ00Vp/cN0/WJQfrOcIIR2+BxuS4b5hD8rIQheazwLhJ8rHwill4xnodKGXEFUZqOzHZrG7lEJx3zFYK/lMvxnYzdeg1CHzlLoEx8wTo3XnILKH7rEsGzq2dP8jkfo0QeRwFD+FLeEp7v6tokkVTBH/4s/49MrCEbs0JczDOHttrbhVg/h7c4QlBa8lwBQaWeKgPY6+xXe4+6X571CsELlrSkC2mpy8AtKLVe/Xl9di56IDcZRqPyye5OkF41vwaHapeudedzZb/K/w/EG2Nqpb9VmwstTgBjvdN3q1MRyax1BCIWufqsaXZJNUVfdqlyg/NWJk2tH21+LhwvEC9bsdvs7354DQl87gvg+s6IxCL/h3k/wPCitqirfaqvbILTvP9r0PvtbcozSKntOin5pk8lKNeF7U4DoqYHy3dmB2Lz6JFD+uQQQfhibDJaaLIVKmwoPQugV05vZcHywyFaJw0szB2EFQu8W+Gl4y/RKEIe35J1wJ6spregZCCtLPu+k/2VCW0yvNSrhZcWaQUMLOFO/wOQhFFpTIBDPmLw0NhkstcNxuUMQ/sBp4MenQOoX5vmRBUo/1mT8fFMEVZXvyWeOFf2R2TRCV6HQUzmAeMQUUdjLzlP4aVNkQYqBlO4A0AEQetKUQSDRg6j8awZNYQE1vM+USdU4ugGUvvQIYWdplzpV7Ex+u6wgJQQQetVvxSon1ZRWuJTtbLkQJLzZ9JUCWzaM7uzyS3Qe4ugh0wqONX2rIBhBpZV2lc/iAdxkO2lGtLIUS5a8am7jEjuRI5nMUfpFbEMNNZTpY/0JN+pqMjpF+fcAAAAASUVORK5CYII=";
 const VIEWS_EYE_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAABU0lEQVR4nO1UsU7DQAyNhBiAgRHxHRR+pTOtupaP6IIUBXL2+XwnVIZ0y9ClCxRWBiZ+CTkhSO1dLmGJGGrJUhTb7/mefZckB/vX5u7dOYEda2Ag4BetzKd49V39s2PJ+TNwWZZHWpmJBv4g4K+YS47kSk0v8Dx/utDIqy5g2idCXkltXJIHd0lgNwGAR6PMVZZlJ+KIdqTB5n6e3QhGGNy5UwKz3i9CpNu2hgh46pOYtWB5yah4Eeo8qcmPCflOK34jMFsDbi7/KhJk5TWleLELjnYU0lVkkbgAejFw84ogp+tQrWD+Ehjg51BSc9S6c0+Kd4mlaXoWHDzaZW8CArMNrOerxIqi6CZok6g5ZkgiDaaSCIBvOiVqG7KsYjPkmkROsjvkn1seH3JsTQl42ramGnjWe02jFw1ZybZIobjIEuo8etEGeSoGeewGea4PNqh9A5YwaO8d5HQ0AAAAAElFTkSuQmCC";
 
+function listingAssetUrl(url) {
+  if (!url) return "";
+  const value = String(url);
+  if (/^(data:|blob:|file:)/i.test(value)) return value;
+
+  const baseUrl = new URL(import.meta.env.VITE_API_BASE_URL?.trim() || window.location.origin, window.location.origin);
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      const isUpload = parsed.pathname.startsWith("/uploads/");
+      const isLocalHost = ["localhost", "127.0.0.1", "10.0.2.2", "192.168.0.23"].includes(parsed.hostname);
+      if (isUpload && (isLocalHost || parsed.origin !== baseUrl.origin)) {
+        return `${baseUrl.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+    } catch {
+      return value;
+    }
+    return value;
+  }
+
+  return value.startsWith("/") ? `${baseUrl.origin}${value}` : `${baseUrl.origin}/${value}`;
+}
+
 function getInitials(name) {
   if (!name) return "??";
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p.charAt(0).toUpperCase()).join("");
@@ -33,7 +56,7 @@ export function VerificationBadge({ status }) {
 }
 
 function OwnerAvatar({ name, avatarUrl }) {
-  return <div className={`listing-owner-avatar ${avatarUrl ? "has-photo" : ""}`}>{avatarUrl ? <img src={avatarUrl} alt={name || "Владелец"} /> : <span>{getInitials(name)}</span>}</div>;
+  return <div className={`listing-owner-avatar ${avatarUrl ? "has-photo" : ""}`}>{avatarUrl ? <img src={listingAssetUrl(avatarUrl)} alt={name || "Владелец"} /> : <span>{getInitials(name)}</span>}</div>;
 }
 
 function OwnerNameWithBadge({ name, status }) {
@@ -50,7 +73,7 @@ function OwnerNameWithBadge({ name, status }) {
 
 export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading, showFavoriteButton = true, footer = null, statusBadge = null, mutedMessage = "", disabledOpen = false, className = "" }) {
   const [index, setIndex] = useState(0);
-  const photos = ad.photoUrls?.length ? ad.photoUrls : ad.photos?.length ? ad.photos : [ad.primaryPhotoUrl || fallbackImage(ad.propertyType)];
+  const photos = (ad.photoUrls?.length ? ad.photoUrls : ad.photos?.length ? ad.photos : [ad.primaryPhotoUrl || fallbackImage(ad.propertyType)]).map(listingAssetUrl);
   const cardClassName = `listing-card glass ${mutedMessage ? "is-muted" : ""} ${className}`.trim();
 
   return (
@@ -76,7 +99,7 @@ export function ListingCard({ ad, onOpen, onToggleFavorite, isFavorite, loading,
 
 export function DetailsModal({ ad, onClose, onToggleFavorite, isFavorite, loading, onOpenDialog, onOpenOwnerProfile, hideActions = false, duplicateWarning = null, footer = null }) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
-  const photos = ad?.photoUrls?.length ? ad.photoUrls : [fallbackImage(ad?.propertyType || "apartment")];
+  const photos = (ad?.photoUrls?.length ? ad.photoUrls : [fallbackImage(ad?.propertyType || "apartment")]).map(listingAssetUrl);
 
   return (
     <Modal onClose={onClose} wide>

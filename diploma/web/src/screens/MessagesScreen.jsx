@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { assetUrl } from "../lib/api";
 
 function ChatIllustration() {
     return (
@@ -14,7 +15,7 @@ function UserAvatar({ name, avatarUrl, className }) {
     if (avatarUrl) {
         return (
             <div className={`${className} has-photo`}>
-                <img src={avatarUrl} alt={name || "Пользователь"} />
+                <img src={assetUrl(avatarUrl)} alt={name || "Пользователь"} />
             </div>
         );
     }
@@ -272,7 +273,6 @@ export function MessagesScreen(props) {
         </div>
     );
 }
-
 
 
 

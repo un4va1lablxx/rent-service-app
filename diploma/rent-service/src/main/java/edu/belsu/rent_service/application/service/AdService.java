@@ -436,7 +436,12 @@ public class AdService {
 
         // Сохраняем фото
         if (request.photoUrls() != null && !request.photoUrls().isEmpty()) {
-            List<String> urls = request.photoUrls();
+            List<String> urls = request.photoUrls().stream()
+                    .map(this::normalizeUploadUrl)
+                    .filter(url -> url != null && !url.isBlank())
+                    .distinct()
+                    .limit(10)
+                    .toList();
             for (int i = 0; i < urls.size(); i++) {
                 Photo photo = Photo.builder()
                         .ad(savedAd)
@@ -457,7 +462,8 @@ public class AdService {
 
         List<String> safeUrls = photoUrls == null ? Collections.emptyList() : photoUrls.stream()
                 .filter(url -> url != null && !url.isBlank())
-                .map(String::trim)
+                .map(this::normalizeUploadUrl)
+                .filter(url -> url != null && !url.isBlank())
                 .distinct()
                 .limit(10)
                 .toList();
@@ -511,6 +517,18 @@ public class AdService {
 
         Path baseDir = Paths.get(System.getProperty("user.dir"), uploadDir).normalize();
         return baseDir.resolve(fileName).normalize();
+    }
+
+    private String normalizeUploadUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
+        String trimmed = url.trim();
+        int markerIndex = trimmed.indexOf("/uploads/");
+        if (markerIndex >= 0) {
+            return trimmed.substring(markerIndex);
+        }
+        return trimmed;
     }
 
     private String sha256(String value) {
