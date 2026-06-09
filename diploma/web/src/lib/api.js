@@ -17,7 +17,7 @@ export function assetUrl(url) {
       const isUpload = parsed.pathname.startsWith("/uploads/");
       const isLocalHost = ["localhost", "127.0.0.1", "10.0.2.2", "192.168.0.23"].includes(parsed.hostname);
 
-      if (isUpload && isLocalHost) {
+      if (isUpload && (isLocalHost || parsed.origin !== baseUrl.origin)) {
         return `${baseUrl.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
       }
     } catch {

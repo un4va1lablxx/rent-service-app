@@ -118,6 +118,9 @@ public class FileUploadService {
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
+        if (base.startsWith("https://") && base.contains(".onrender.com:8080")) {
+            base = base.replace(".onrender.com:8080", ".onrender.com");
+        }
 
         return base + "/uploads/" + filename;
     }

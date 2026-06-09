@@ -26,10 +26,10 @@ export function assetUrl(url) {
     if (/^https?:\/\//i.test(value)) {
         try {
             const parsed = new URL(value);
-            if (["localhost", "127.0.0.1", "10.0.2.2", "192.168.0.23"].includes(parsed.hostname)) {
-                parsed.protocol = base.protocol;
-                parsed.host = base.host;
-                return parsed.toString();
+            const isUpload = parsed.pathname.startsWith("/uploads/");
+            const isLocalHost = ["localhost", "127.0.0.1", "10.0.2.2", "192.168.0.23"].includes(parsed.hostname);
+            if (isUpload && (isLocalHost || parsed.origin !== base.origin)) {
+                return `${base.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
             }
         } catch {
             return value;

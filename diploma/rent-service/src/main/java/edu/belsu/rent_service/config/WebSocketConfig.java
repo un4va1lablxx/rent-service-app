@@ -19,6 +19,14 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(messageUpdatesWebSocketHandler, "/ws/messages")
-                .setAllowedOriginPatterns("http://localhost:*", "http://127.0.0.1:*");
+                .setAllowedOriginPatterns(
+                        "http://localhost:*",
+                        "http://127.0.0.1:*",
+                        "http://192.168.0.23:*",
+                        "https://rent-service-app.onrender.com",
+                        "https://*.onrender.com",
+                        "https://rent-service-app.vercel.app",
+                        "https://*.vercel.app"
+                );
     }
 }
