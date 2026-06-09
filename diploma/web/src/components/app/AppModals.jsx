@@ -1,5 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 
+import { assetUrl } from "../../lib/api";
+
 export function AppModals(props) {
     const {
         profile,
@@ -705,7 +707,7 @@ export function AppModals(props) {
                                         </div>
 
                                         {contractModal.documentUrl && (
-                                            <a className="secondary-button contract-open-button" href={contractModal.documentUrl} target="_blank" rel="noreferrer">Открыть проект договора</a>
+                                            <a className="secondary-button contract-open-button" href={assetUrl(contractModal.documentUrl)} target="_blank" rel="noreferrer">Открыть проект договора</a>
                                         )}
 
                                         <label className="checkbox-row contract-checkbox-row">
@@ -753,7 +755,7 @@ export function AppModals(props) {
                                         </div>
                                         <div className="actions-row contract-modal-actions">
                                             {paymentModal.receiptUrl && (
-                                                <a className="primary-button" href={paymentModal.receiptUrl} target="_blank" rel="noreferrer">
+                                                <a className="primary-button" href={assetUrl(paymentModal.receiptUrl)} target="_blank" rel="noreferrer">
                                                     Скачать чек
                                                 </a>
                                             )}

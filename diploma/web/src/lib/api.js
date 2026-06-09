@@ -1,5 +1,38 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.trim() || "http://192.168.0.23:8080";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL?.trim() || window.location.origin;
+
+export function assetUrl(url) {
+  if (!url) return "";
+
+  const value = String(url);
+  if (/^(data:|blob:|file:)/i.test(value)) {
+    return value;
+  }
+
+  const baseUrl = new URL(API_BASE_URL, window.location.origin);
+
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      const isUpload = parsed.pathname.startsWith("/uploads/");
+      const isLocalHost = ["localhost", "127.0.0.1", "10.0.2.2", "192.168.0.23"].includes(parsed.hostname);
+
+      if (isUpload && isLocalHost) {
+        return `${baseUrl.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+    } catch {
+      return value;
+    }
+
+    return value;
+  }
+
+  if (value.startsWith("/")) {
+    return `${baseUrl.origin}${value}`;
+  }
+
+  return `${baseUrl.origin}/${value}`;
+}
 
 function resolveWebSocketUrl(path) {
   const baseUrl = new URL(API_BASE_URL);
@@ -7,7 +40,7 @@ function resolveWebSocketUrl(path) {
   return `${protocol}//${baseUrl.host}${path}`;
 }
 
-async function request(path, options = {}) {
+export async function request(path, options = {}) {
   const token = localStorage.getItem("rent-service-token");
   const headers = new Headers(options.headers || {});
 

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { storage } from "../lib/api";
+import { API_BASE_URL, assetUrl, storage } from "../lib/api";
 
 const MAX_AD_IMAGES = 10;
 
@@ -30,7 +30,7 @@ export default function ImageUploader({ existingImages = [], onImagesUploaded })
         });
 
         try {
-            const response = await fetch("http://192.168.0.23:8080/api/upload/photos", {
+            const response = await fetch(`${API_BASE_URL}/api/upload/photos`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${storage.getToken()}`
@@ -95,7 +95,7 @@ export default function ImageUploader({ existingImages = [], onImagesUploaded })
                             moveImage(fromIndex, index);
                         }}
                     >
-                        <img src={url} alt={`Фото ${index + 1}`} />
+                        <img src={assetUrl(url)} alt={`Фото ${index + 1}`} />
                         <button type="button" className="remove-image" onClick={() => removeImage(index)}>×</button>
                     </div>
                 ))}

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { adminApi, adsApi, authApi, favoritesApi, messagesApi, messagesSocketApi, notificationsApi, storage, usersApi } from "../lib/api";
+import { adminApi, adsApi, assetUrl, authApi, favoritesApi, messagesApi, messagesSocketApi, notificationsApi, request, storage, usersApi } from "../lib/api";
 import { initialDraft, navItems } from "../shared/appConstants";
 import { dialogKey, normalizeInteger, normalizeNumber } from "../shared/formUtils";
 import { calculateRentalDuration, formatMoscowDateWords } from "../shared/time";
@@ -465,23 +465,13 @@ export function useRentServiceApp() {
     async function sendTelegramCode(username) {
         try {
             setLoadingMap(prev => ({ ...prev, 'telegram': true }));
-            const response = await fetch('http://192.168.0.23:8080/api/telegram/send-code', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${storage.getToken()}`
-                },
+            await request("/api/telegram/send-code", {
+                method: "POST",
                 body: JSON.stringify({ username })
             });
-
-            if (response.ok) {
-                setNotice("Код подтверждения отправлен в Telegram.");
-                setTelegramConnectStep("verify");
-                setTelegramCode(username);
-            } else {
-                const error = await response.json();
-                setError(error.message || "Не удалось отправить код");
-            }
+            setNotice("Код подтверждения отправлен в Telegram.");
+            setTelegramConnectStep("verify");
+            setTelegramCode(username);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -491,26 +481,16 @@ export function useRentServiceApp() {
 
     async function verifyTelegramCode(code) {
         try {
-            const response = await fetch('http://192.168.0.23:8080/api/telegram/verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${storage.getToken()}`
-                },
+            await request("/api/telegram/verify", {
+                method: "POST",
                 body: JSON.stringify({ code })
             });
-
-            if (response.ok) {
-                const me = await authApi.me();
-                setProfile(me);
-                setShowTelegramConnect(false);
-                setTelegramConnectStep("input");
-                setTelegramCode("");
-                setNotice("Telegram успешно подключен.");
-            } else {
-                const error = await response.json();
-                setError(error.message || "Неверный код");
-            }
+            const me = await authApi.me();
+            setProfile(me);
+            setShowTelegramConnect(false);
+            setTelegramConnectStep("input");
+            setTelegramCode("");
+            setNotice("Telegram успешно подключен.");
         } catch (err) {
             setError(err.message);
         }
@@ -1141,7 +1121,7 @@ export function useRentServiceApp() {
                 signImmediately: contractModal.signImmediately
             });
             setContractModal(createInitialContractModal());
-            window.open(response.documentUrl, "_blank", "noopener,noreferrer");
+            window.open(assetUrl(response.documentUrl), "_blank", "noopener,noreferrer");
             await loadDialogMessages(selectedDialog);
             await loadDialogs(true);
         } catch (err) {

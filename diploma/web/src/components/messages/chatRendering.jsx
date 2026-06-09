@@ -1,5 +1,6 @@
 import { parseSystemPayload } from "../../shared/formUtils";
 import { formatMoscowTime } from "../../shared/time";
+import { assetUrl } from "../../lib/api";
 
 export function renderChatMessage({
     message,
@@ -97,12 +98,12 @@ export function renderChatMessage({
                     </div>
                 )}
                 {message.messageType !== "payment_success" && message.messageType !== "contract_sent" && payload.documentUrl && (
-                    <a className="chat-ad-link" href={payload.documentUrl} target="_blank" rel="noreferrer">
+                    <a className="chat-ad-link" href={assetUrl(payload.documentUrl)} target="_blank" rel="noreferrer">
                         Открыть
                     </a>
                 )}
                 {message.messageType === "payment_success" && payload.receiptUrl && (
-                    <a className="chat-ad-link" href={payload.receiptUrl} target="_blank" rel="noreferrer">
+                    <a className="chat-ad-link" href={assetUrl(payload.receiptUrl)} target="_blank" rel="noreferrer">
                         Скачать чек
                     </a>
                 )}
@@ -163,7 +164,7 @@ export function renderChatMessage({
                 )}
                 {showContractOpenButton && (
                     <div className="system-message-actions system-message-actions-column">
-                        <a className="secondary-button chat-system-link-button" href={payload.documentUrl} target="_blank" rel="noreferrer">
+                        <a className="secondary-button chat-system-link-button" href={assetUrl(payload.documentUrl)} target="_blank" rel="noreferrer">
                             Открыть
                         </a>
                     </div>
