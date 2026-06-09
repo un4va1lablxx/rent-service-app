@@ -71,6 +71,7 @@ export function useRentServiceApp() {
     const messageSocketRef = useRef(null);
     const messageSocketReconnectRef = useRef(null);
     const selectedDialogRef = useRef(null);
+    const composeTextRef = useRef("");
     const loadDialogsRef = useRef(null);
     const loadDialogMessagesRef = useRef(null);
 
@@ -253,6 +254,10 @@ export function useRentServiceApp() {
     }, [selectedDialog]);
 
     useEffect(() => {
+        composeTextRef.current = composeText;
+    }, [composeText]);
+
+    useEffect(() => {
         if (!selectedDialog?.adId) {
             return;
         }
@@ -318,10 +323,16 @@ export function useRentServiceApp() {
                         return;
                     }
 
-                    await loadDialogsRef.current?.(true);
+                    if (!composeTextRef.current.trim()) {
+                        await loadDialogsRef.current?.(true);
+                    }
 
                     const currentDialog = selectedDialogRef.current;
-                    if (currentDialog && (!payload.adId || Number(payload.adId) === Number(currentDialog.adId))) {
+                    if (
+                        currentDialog
+                        && !composeTextRef.current.trim()
+                        && (!payload.adId || Number(payload.adId) === Number(currentDialog.adId))
+                    ) {
                         await loadDialogMessagesRef.current?.(currentDialog);
                     }
                 } catch (err) {
@@ -512,6 +523,11 @@ export function useRentServiceApp() {
         }
 
         if (selectedTab === "messages") {
+            if (composeTextRef.current.trim()) {
+                await loadNotifications();
+                return;
+            }
+
             await Promise.all([
                 loadNotifications(),
                 loadDialogs(true)
