@@ -4322,11 +4322,19 @@ th {
 
 .notifications-button {
   position: relative;
+  aspect-ratio: 1;
+  flex-shrink: 0;
 }
 
 .notifications-button img {
   width: 22px;
   height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  display: block;
+  object-fit: contain;
+  aspect-ratio: 1;
+  flex: 0 0 22px;
 }
 
 .notifications-modal {
@@ -5769,7 +5777,7 @@ th {
 
   .topbar-account .icon-button,
   .notifications-button {
-    flex-basis: 34px;
+    flex: 0 0 34px;
     width: 34px;
     min-width: 34px;
     height: 34px;

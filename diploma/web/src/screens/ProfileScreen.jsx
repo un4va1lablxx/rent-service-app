@@ -117,7 +117,16 @@ function parseRequestData(serialized) {
     }
 }
 
-function buildVerificationCardMeta(request, fallbackText) {
+function buildVerificationCardMeta(request, fallbackText, isApproved = false) {
+    if (isApproved) {
+        return {
+            label: "Одобрено",
+            tone: "approved",
+            icon: "tick",
+            caption: fallbackText
+        };
+    }
+
     const normalizedStatus = (request?.status || "").toLowerCase();
     if (normalizedStatus === "approved") {
         return {
@@ -422,9 +431,14 @@ export function ProfileScreen(props) {
     const effectiveTrustedRequest = !isTrustedApproved && visibleTrustedRequest?.status === "approved" ? null : visibleTrustedRequest;
     const ownerCardMeta = buildVerificationCardMeta(
         effectiveOwnerRequest,
-        effectiveOwnerRequest?.cadastralNumber || "Нужны документы и кадастровый номер"
+        effectiveOwnerRequest?.cadastralNumber || "Статус собственника подтвержден",
+        isOwnerApproved
     );
-    const trustedCardMeta = buildVerificationCardMeta(effectiveTrustedRequest, "Требуется минимум 3 завершенные аренды");
+    const trustedCardMeta = buildVerificationCardMeta(
+        effectiveTrustedRequest,
+        isTrustedApproved ? "Статус надежного партнера подтвержден" : "Требуется минимум 3 завершенные аренды",
+        isTrustedApproved
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -494,14 +508,14 @@ export function ProfileScreen(props) {
     }, [trustedRequestData]);
 
     useEffect(() => {
-        if (latestOwnerRequest?.status !== "approved") {
+        if (!isOwnerApproved && latestOwnerRequest?.status !== "approved") {
             setActiveVerificationForm("owner_verified");
             return;
         }
-        if (latestTrustedRequest?.status !== "approved") {
+        if (!isTrustedApproved && latestTrustedRequest?.status !== "approved") {
             setActiveVerificationForm("trusted_partner");
         }
-    }, [latestOwnerRequest?.status, latestTrustedRequest?.status]);
+    }, [isOwnerApproved, isTrustedApproved, latestOwnerRequest?.status, latestTrustedRequest?.status]);
 
     useEffect(() => {
         setPassportDraft({
