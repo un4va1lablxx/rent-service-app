@@ -398,7 +398,7 @@ export function useRentServiceApp() {
         loadNotifications();
         const interval = window.setInterval(() => {
             loadNotifications();
-        }, 12000);
+        }, 45000);
         return () => window.clearInterval(interval);
     }, [profile?.id]);
 
@@ -420,7 +420,6 @@ export function useRentServiceApp() {
             }
         };
 
-        const interval = window.setInterval(refresh, 20000);
         const handleVisibilityChange = () => {
             if (!document.hidden) {
                 refresh();
@@ -432,7 +431,6 @@ export function useRentServiceApp() {
 
         return () => {
             disposed = true;
-            window.clearInterval(interval);
             document.removeEventListener("visibilitychange", handleVisibilityChange);
             window.removeEventListener("focus", refresh);
         };
