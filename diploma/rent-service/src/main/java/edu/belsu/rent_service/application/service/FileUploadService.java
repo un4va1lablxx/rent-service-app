@@ -1,5 +1,13 @@
 package edu.belsu.rent_service.application.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -7,12 +15,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.StandardOpenOption;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,22 +32,31 @@ public class FileUploadService {
     @Value("${file.upload-dir:./uploads}")
     private String uploadDir;
 
+    @Value("${cloudinary.cloud-name:}")
+    private String cloudinaryCloudName;
+
+    @Value("${cloudinary.api-key:}")
+    private String cloudinaryApiKey;
+
+    @Value("${cloudinary.api-secret:}")
+    private String cloudinaryApiSecret;
+
+    @Value("${cloudinary.folder:rent-service}")
+    private String cloudinaryFolder;
+
+    private final OkHttpClient httpClient = new OkHttpClient();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     public List<String> savePhotos(List<MultipartFile> files, Authentication authentication) {
         List<String> urls = new ArrayList<>();
 
-        try {
-            Path uploadPath = getUploadPath();
-
-            for (MultipartFile file : files) {
+        for (MultipartFile file : files) {
+            try {
                 String filename = generateSafeFilename(file.getOriginalFilename(), file.getContentType());
-                Path filePath = uploadPath.resolve(filename);
-
-                file.transferTo(filePath.toFile());
-
-                urls.add(buildPublicUrl(filename));
+                urls.add(saveBytes(file.getBytes(), filename, file.getContentType()));
+            } catch (IOException e) {
+                throw new RuntimeException("Ошибка при сохранении файлов: " + e.getMessage(), e);
             }
-        } catch (IOException e) {
-            throw new RuntimeException("Ошибка при сохранении файлов: " + e.getMessage(), e);
         }
 
         return urls;
@@ -45,14 +64,8 @@ public class FileUploadService {
 
     public String savePhotoFromStream(InputStream inputStream, String filename) {
         try {
-            Path uploadPath = getUploadPath();
-
             String safeFilename = sanitizeFilename(filename);
-            Path filePath = uploadPath.resolve(safeFilename);
-
-            Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
-
-            return buildPublicUrl(safeFilename);
+            return saveBytes(inputStream.readAllBytes(), safeFilename, contentTypeFromFilename(safeFilename));
         } catch (IOException e) {
             throw new RuntimeException("Ошибка сохранения фото из Telegram", e);
         }
@@ -60,25 +73,73 @@ public class FileUploadService {
 
     public String saveMultipartFile(MultipartFile file) {
         try {
-            Path uploadPath = getUploadPath();
-
             String filename = generateSafeFilename(file.getOriginalFilename(), file.getContentType());
-            Path filePath = uploadPath.resolve(filename);
-
-            file.transferTo(filePath.toFile());
-
-            return buildPublicUrl(filename);
+            return saveBytes(file.getBytes(), filename, file.getContentType());
         } catch (IOException e) {
             throw new RuntimeException("Ошибка при сохранении файла", e);
         }
     }
 
     public String saveFile(byte[] bytes, String filename) {
+        String safeFilename = sanitizeFilename(filename);
+        return saveBytes(bytes, safeFilename, contentTypeFromFilename(safeFilename));
+    }
+
+    private String saveBytes(byte[] bytes, String filename, String contentType) {
+        if (isCloudinaryConfigured()) {
+            return uploadToCloudinary(bytes, filename, contentType);
+        }
+        return saveToLocalDisk(bytes, filename);
+    }
+
+    private String uploadToCloudinary(byte[] bytes, String filename, String contentType) {
+        try {
+            long timestamp = System.currentTimeMillis() / 1000;
+            String publicId = buildCloudinaryPublicId(filename);
+            String signature = signCloudinaryUpload(publicId, timestamp);
+            String uploadUrl = "https://api.cloudinary.com/v1_1/" + cloudinaryCloudName.trim() + "/auto/upload";
+
+            RequestBody fileBody = RequestBody.create(
+                    bytes,
+                    MediaType.parse(contentType == null || contentType.isBlank() ? "application/octet-stream" : contentType)
+            );
+
+            RequestBody requestBody = new MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("file", filename, fileBody)
+                    .addFormDataPart("api_key", cloudinaryApiKey.trim())
+                    .addFormDataPart("timestamp", String.valueOf(timestamp))
+                    .addFormDataPart("public_id", publicId)
+                    .addFormDataPart("signature", signature)
+                    .build();
+
+            Request request = new Request.Builder()
+                    .url(uploadUrl)
+                    .post(requestBody)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                String responseBody = response.body() == null ? "" : response.body().string();
+                if (!response.isSuccessful()) {
+                    throw new RuntimeException("Cloudinary upload failed: HTTP " + response.code() + " " + responseBody);
+                }
+
+                JsonNode json = objectMapper.readTree(responseBody);
+                String secureUrl = json.path("secure_url").asText("");
+                if (secureUrl.isBlank()) {
+                    throw new RuntimeException("Cloudinary upload response does not contain secure_url");
+                }
+                return secureUrl;
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Ошибка загрузки файла в Cloudinary", e);
+        }
+    }
+
+    private String saveToLocalDisk(byte[] bytes, String filename) {
         try {
             Path uploadPath = getUploadPath();
-
-            String safeFilename = sanitizeFilename(filename);
-            Path filePath = uploadPath.resolve(safeFilename);
+            Path filePath = uploadPath.resolve(filename);
 
             Files.write(
                     filePath,
@@ -87,7 +148,7 @@ public class FileUploadService {
                     StandardOpenOption.TRUNCATE_EXISTING
             );
 
-            return buildPublicUrl(safeFilename);
+            return "/uploads/" + filename;
         } catch (IOException e) {
             throw new RuntimeException("Ошибка сохранения файла", e);
         }
@@ -109,8 +170,34 @@ public class FileUploadService {
         return path;
     }
 
-    private String buildPublicUrl(String filename) {
-        return "/uploads/" + filename;
+    private boolean isCloudinaryConfigured() {
+        return hasText(cloudinaryCloudName) && hasText(cloudinaryApiKey) && hasText(cloudinaryApiSecret);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String buildCloudinaryPublicId(String filename) {
+        String safeFilename = sanitizeFilename(filename);
+        int dotIndex = safeFilename.lastIndexOf('.');
+        String withoutExtension = dotIndex > 0 ? safeFilename.substring(0, dotIndex) : safeFilename;
+        String safeFolder = cloudinaryFolder == null ? "rent-service" : cloudinaryFolder.trim();
+        if (safeFolder.isBlank()) {
+            return withoutExtension;
+        }
+        return safeFolder.replaceAll("^/+|/+$", "") + "/" + withoutExtension;
+    }
+
+    private String signCloudinaryUpload(String publicId, long timestamp) {
+        String payload = "public_id=" + publicId + "&timestamp=" + timestamp + cloudinaryApiSecret.trim();
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            byte[] hash = digest.digest(payload.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("Ошибка подписи Cloudinary upload", e);
+        }
     }
 
     private String generateSafeFilename(String originalFilename, String contentType) {
@@ -135,8 +222,19 @@ public class FileUploadService {
             case "image/png" -> ".png";
             case "image/webp" -> ".webp";
             case "application/pdf" -> ".pdf";
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> ".docx";
             default -> "";
         };
+    }
+
+    private String contentTypeFromFilename(String filename) {
+        String lower = filename == null ? "" : filename.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".pdf")) return "application/pdf";
+        if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        return "application/octet-stream";
     }
 
     private String sanitizeFilename(String filename) {

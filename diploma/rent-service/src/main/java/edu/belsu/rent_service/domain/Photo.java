@@ -22,13 +22,13 @@ public class Photo {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ad_id", nullable = false)
+    @JoinColumn(name = "ad_id")
     private Ad ad;
 
     @Column(name = "photo_url", nullable = false)
     private String photoUrl;
 
-    @Column(name = "photo_hash", nullable = false, length = 64)
+    @Column(name = "photo_hash", length = 64)
     private String photoHash;
 
     @Column(name = "is_primary")
